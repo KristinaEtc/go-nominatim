@@ -17,9 +17,20 @@ type ReverseGeocode struct {
 	db              *sql.DB
 }
 
-func NewReverseGeocode(db sql.DB) ReverseGeocode {
-	r := ReverseGeocode{db: &db}
-	return r
+func NewReverseGeocode(sqlOpenStr string) (*ReverseGeocode, error) {
+
+	db, err := sql.Open("postgres", sqlOpenStr)
+	if err != nil {
+		return nil, err
+
+	}
+	r := ReverseGeocode{db: db}
+	//log.Println(r.db)
+	return &r, nil
+}
+
+func (r *ReverseGeocode) Close() {
+	r.db.Close()
 }
 
 func (r *ReverseGeocode) SetLocation(fLat, fLon float64) {
@@ -28,7 +39,7 @@ func (r *ReverseGeocode) SetLocation(fLat, fLon float64) {
 	//log.Printf(fla, ...)
 }
 
-func (r ReverseGeocode) SetLanguagePreference() {
+func (r *ReverseGeocode) SetLanguagePreference() {
 	log.Print("set language pref")
 }
 
@@ -36,11 +47,11 @@ func (r *ReverseGeocode) SetRank(iRank int) {
 	r.iMaxRank = iRank
 }
 
-func (r ReverseGeocode) SetIncludeAddeessDetails(bAddressDetails bool) {
+func (r *ReverseGeocode) SetIncludeAddeessDetails(bAddressDetails bool) {
 	r.bAddressDetails = bAddressDetails
 }
 
-func (r ReverseGeocode) SetZoom(iZoom int) {
+func (r *ReverseGeocode) SetZoom(iZoom int) {
 	aZoomRank := map[int]int{
 		0:  2,
 		1:  2,
@@ -75,7 +86,7 @@ func (r ReverseGeocode) SetZoom(iZoom int) {
 
 }
 
-func (r ReverseGeocode) Lookup() {
+func (r *ReverseGeocode) Lookup() {
 	//sLon := strconv.FormatFloat(r.fLon, 'f', 6, 64)
 	//sLat := strconv.FormatFloat(r.fLat, 'f', 6, 64)
 
@@ -95,6 +106,8 @@ func (r ReverseGeocode) Lookup() {
 	var iPlaceID int
 	var iParentPlace int
 	var iRank int
+
+	//log.Printf("Lookup %v\n", r)
 
 	for fSearchDiam < fMaxAreaDistance && !hasPlaceID {
 
@@ -149,7 +162,6 @@ func (r ReverseGeocode) Lookup() {
 			log.Println(iPlaceID, iParentPlace, iRank)
 			hasPlaceID = true
 		}
-
 	}
 
 	var hasParentPlace bool = false
@@ -175,4 +187,5 @@ func (r ReverseGeocode) Lookup() {
 		log.Println(iNewPlaceID)
 		hasParentPlace = true
 	}
+
 }

@@ -46,21 +46,13 @@ func (l *LocationParams) getParams() {
 	return
 }
 
-func (l *LocationParams) getDB(sqlOpenStr string) {
-	db, err := sql.Open("postgres", sqlOpenStr)
-	if err != nil {
-		log.Fatal(err) ///qqqqqqq
-
-	}
-	l.db = db
-}
-
 func (l *LocationParams) configurateDB() {
 
 	file, err := os.Open(configFile)
 	if err != nil {
 		log.Printf("No configurate file")
 	} else {
+		defer file.Close()
 		decoder := json.NewDecoder(file)
 		configuration := ConfigDB{}
 		err := decoder.Decode(&configuration)
@@ -85,14 +77,16 @@ func main() {
 		" user=" + l.config.User +
 		" password=" + l.config.Password
 
-	l.getDB(sqlOpenStr)
-
-	oReverseGeocode := Nominatim.NewReverseGeocode(*l.db)
+	reverseGeocode, err := Nominatim.NewReverseGeocode(sqlOpenStr)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer reverseGeocode.Close()
 	//oReverseGeocode.SetLanguagePreference()
-	oReverseGeocode.SetIncludeAddeessDetails(l.addressDetails)
-	oReverseGeocode.SetZoom(l.zoom)
-	oReverseGeocode.SetLocation(l.lat, l.lon)
+	reverseGeocode.SetIncludeAddeessDetails(l.addressDetails)
+	reverseGeocode.SetZoom(l.zoom)
+	reverseGeocode.SetLocation(l.lat, l.lon)
 
-	oReverseGeocode.Lookup()
+	reverseGeocode.Lookup()
 
 }
