@@ -1,0 +1,6 @@
+{
+	"DBname": "nominatim",
+	"Host": "127.0.0.1",
+	"User": "user",
+	"Password": "password"
+}
