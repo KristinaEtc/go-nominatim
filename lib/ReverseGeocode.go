@@ -13,8 +13,8 @@ type ReverseGeocode struct {
 	fLon     float64
 	iMaxRank int
 	//aLangPreOrder
-	bAddressDetails bool
-	db              *sql.DB
+	addressDetails bool
+	db             *sql.DB
 }
 
 func NewReverseGeocode(sqlOpenStr string) (*ReverseGeocode, error) {
@@ -47,8 +47,8 @@ func (r *ReverseGeocode) SetRank(iRank int) {
 	r.iMaxRank = iRank
 }
 
-func (r *ReverseGeocode) SetIncludeAddeessDetails(bAddressDetails bool) {
-	r.bAddressDetails = bAddressDetails
+func (r *ReverseGeocode) SetIncludeAddressDetails(addressDetails bool) {
+	r.addressDetails = addressDetails
 }
 
 func (r *ReverseGeocode) SetZoom(iZoom int) {
@@ -86,7 +86,7 @@ func (r *ReverseGeocode) SetZoom(iZoom int) {
 
 }
 
-func (r *ReverseGeocode) Lookup() {
+func (r *ReverseGeocode) Lookup() map[string]string {
 	//sLon := strconv.FormatFloat(r.fLon, 'f', 6, 64)
 	//sLat := strconv.FormatFloat(r.fLat, 'f', 6, 64)
 
@@ -101,11 +101,13 @@ func (r *ReverseGeocode) Lookup() {
 	)
 
 	var sSQL string
-
 	var hasPlaceID bool = false
-	var iPlaceID int
-	var iParentPlace int
-	var iRank int
+
+	var (
+		iPlaceID     int
+		iParentPlace int
+		iRank        int
+	)
 
 	//log.Printf("Lookup %v\n", r)
 
@@ -188,4 +190,13 @@ func (r *ReverseGeocode) Lookup() {
 		hasParentPlace = true
 	}
 
+	if hasPlaceID {
+		placeLookup := NewPlaceLookup(*r.db)
+		//placeLookup.SetLanguagePreference()
+		placeLookup.SetIncludeAddressDetails(r.addressDetails)
+		placeLookup.SetPlaceID(iPlaceID)
+		return placeLookup.Lookup()
+	} else {
+		return nil
+	}
 }

@@ -295,7 +295,7 @@ func getClassTypes() (m map[string]map[string]string) {
 		"railway:abandoned":            {"label": "Abandoned", "frequency": "641", "icon": ""},
 		"railway:disused":              {"label": "Disused", "frequency": "72", "icon": ""},
 	}
-	//return m
+	return
 
 	/*for key, word := range m {
 		fmt.Print(key, ":")

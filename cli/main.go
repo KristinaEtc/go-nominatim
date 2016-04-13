@@ -29,7 +29,6 @@ type LocationParams struct {
 }
 
 //var baseURL string = "http://192.168.240.105/nominatim/"
-
 //"-c nominatim/reverse?format=xml&lat=53.913658&lon=27.600286&zoom=18&addressdetails=1"
 
 func (l *LocationParams) getParams() {
@@ -83,10 +82,11 @@ func main() {
 	}
 	defer reverseGeocode.Close()
 	//oReverseGeocode.SetLanguagePreference()
-	reverseGeocode.SetIncludeAddeessDetails(l.addressDetails)
+	reverseGeocode.SetIncludeAddressDetails(l.addressDetails)
 	reverseGeocode.SetZoom(l.zoom)
 	reverseGeocode.SetLocation(l.lat, l.lon)
 
-	reverseGeocode.Lookup()
-
+	place := reverseGeocode.Lookup()
+	log.Println(place)
+	//reverseGeocode.ShowData()
 }
