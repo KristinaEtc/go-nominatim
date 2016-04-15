@@ -226,7 +226,7 @@ func (r *ReverseGeocode) Lookup() DataWithoutDetaild {
 	log.Println("place_id:", iPlaceID)
 
 	if iPlaceID.Valid {
-		placeLookup := NewPlaceLookup(&r.db)
+		placeLookup := NewPlaceLookup(r.db)
 		//placeLookup.SetLanguagePreference()
 		placeLookup.SetIncludeAddressDetails(r.addressDetails)
 		placeLookup.SetPlaceID(iPlaceID.Int64)
