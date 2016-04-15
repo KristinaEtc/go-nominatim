@@ -18,7 +18,7 @@ import (
 
 var configFile = "config.json"
 
-var testFile = "test.csv"
+var testFile = "test.csvt"
 var numOfReq = 0
 
 type ConfigDB struct {
@@ -139,6 +139,8 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	found := 0
+	errors := 0
 	defer reverseGeocode.Close()
 	for _, data := range l {
 		//log.Println("Request:", i)
@@ -147,8 +149,15 @@ func main() {
 		reverseGeocode.SetIncludeAddressDetails(p.addressDetails)
 		reverseGeocode.SetZoom(data.zoom)
 		reverseGeocode.SetLocation(data.lat, data.lon)
-		place := reverseGeocode.Lookup()
+		place, err := reverseGeocode.Lookup()
+		if err != nil {
+			//log.Println(err)
+			errors++
+			continue
+		}
+		found++
 		log.Println(place)
 	}
+	log.Println("found:", found, "errors:", errors)
 
 }

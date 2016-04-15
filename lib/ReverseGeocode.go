@@ -6,6 +6,7 @@ import (
 	_ "github.com/lib/pq"
 	"log"
 	//"strconv"
+	"errors"
 )
 
 type ReverseGeocode struct {
@@ -36,7 +37,7 @@ func (d DataWithoutDetaild) String() string {
 	return str
 }
 
-func dataMapToStruct(m map[string]string) DataWithoutDetaild {
+func dataMapToStruct(m map[string]string) *DataWithoutDetaild {
 	dataStr := DataWithoutDetaild{place_id: m["place_id"],
 		osm_id:      m["osm_id"],
 		osm_type:    m["osm_type"],
@@ -44,7 +45,7 @@ func dataMapToStruct(m map[string]string) DataWithoutDetaild {
 		lon:         m["lon"],
 		langaddress: m["langaddress"],
 	}
-	return dataStr
+	return &dataStr
 }
 
 func NewReverseGeocode(sqlOpenStr string) (*ReverseGeocode, error) {
@@ -115,7 +116,7 @@ func (r *ReverseGeocode) SetZoom(iZoom int) {
 	}*/
 }
 
-func (r *ReverseGeocode) Lookup() DataWithoutDetaild {
+func (r *ReverseGeocode) Lookup() (*DataWithoutDetaild, error) {
 	//sLon := strconv.FormatFloat(r.fLon, 'f', 6, 64)
 	//sLat := strconv.FormatFloat(r.fLat, 'f', 6, 64)
 
@@ -186,7 +187,8 @@ func (r *ReverseGeocode) Lookup() DataWithoutDetaild {
 		err := r.db.QueryRow(sSQL, r.fLon, r.fLat, fSearchDiam, iMaxRank).Scan(&iPlaceID, &iParentPlace, &iRank)
 		switch {
 		case err == sql.ErrNoRows:
-			log.Printf("Not found.")
+			//log.Printf("Not found.")
+			return nil, err
 		case err != nil:
 			log.Fatal(err, "QueryRow")
 		default:
@@ -231,9 +233,8 @@ func (r *ReverseGeocode) Lookup() DataWithoutDetaild {
 		placeLookup.SetIncludeAddressDetails(r.addressDetails)
 		placeLookup.SetPlaceID(iPlaceID.Int64)
 		dataMap := placeLookup.Lookup()
-		return dataMapToStruct(dataMap)
+		return dataMapToStruct(dataMap), nil
 	} else {
-		data := DataWithoutDetaild{}
-		return data
+		return nil, errors.New("place not found")
 	}
 }
