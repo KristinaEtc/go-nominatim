@@ -140,8 +140,11 @@ func (p *PlaceLookup) Lookup() (placeData map[string]string) {
 		placeData[col] = fmt.Sprintf("%v", v)
 	}
 
-	//log.Println(placeData)
-	//log.Println()
+	/*for keyIn, wordIn := range placeData {
+		if wordIn != "<nil>" {
+			fmt.Print(keyIn, ": ", wordIn, "\n")
+		}
+	}*/
 
 	/*if p.addressDetails == true {
 		address = getAddressNames()

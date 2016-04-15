@@ -17,6 +17,36 @@ type ReverseGeocode struct {
 	db             *sql.DB
 }
 
+type DataWithoutDetaild struct {
+	place_id    string
+	osm_type    string
+	osm_id      string
+	lat         string
+	lon         string
+	langaddress string
+}
+
+func (d DataWithoutDetaild) String() string {
+	var str = "\nplace_id: " + d.place_id +
+		"\nosm_id: " + d.osm_id +
+		"\nosm_type: " + d.osm_type +
+		"\nlat: " + d.lat +
+		"\nlon: " + d.lon +
+		"\nlangaddress: " + d.langaddress + "\n"
+	return str
+}
+
+func dataMapToStruct(m map[string]string) DataWithoutDetaild {
+	dataStr := DataWithoutDetaild{place_id: m["place_id"],
+		osm_id:      m["osm_id"],
+		osm_type:    m["osm_type"],
+		lat:         m["lat"],
+		lon:         m["lon"],
+		langaddress: m["langaddress"],
+	}
+	return dataStr
+}
+
 func NewReverseGeocode(sqlOpenStr string) (*ReverseGeocode, error) {
 
 	db, err := sql.Open("postgres", sqlOpenStr)
@@ -83,10 +113,9 @@ func (r *ReverseGeocode) SetZoom(iZoom int) {
 	/*if r.iMaxRank = 28; aZoomRank[iZoom] {
 		r.iMaxRank = aZoomRank[iZoom]
 	}*/
-
 }
 
-func (r *ReverseGeocode) Lookup() map[string]string {
+func (r *ReverseGeocode) Lookup() DataWithoutDetaild {
 	//sLon := strconv.FormatFloat(r.fLon, 'f', 6, 64)
 	//sLat := strconv.FormatFloat(r.fLat, 'f', 6, 64)
 
@@ -153,7 +182,7 @@ func (r *ReverseGeocode) Lookup() map[string]string {
 			ASC limit 1
 			`
 
-		log.Printf("%f %f %f %d", r.fLon, r.fLat, fSearchDiam, iMaxRank)
+		//log.Printf("%f %f %f %d", r.fLon, r.fLat, fSearchDiam, iMaxRank)
 		err := r.db.QueryRow(sSQL, r.fLon, r.fLat, fSearchDiam, iMaxRank).Scan(&iPlaceID, &iParentPlace, &iRank)
 		switch {
 		case err == sql.ErrNoRows:
@@ -161,7 +190,7 @@ func (r *ReverseGeocode) Lookup() map[string]string {
 		case err != nil:
 			log.Fatal(err, "qR")
 		default:
-			log.Println(iPlaceID, iParentPlace, iRank)
+			//log.Println(iPlaceID, iParentPlace, iRank)
 			hasPlaceID = true
 		}
 	}
@@ -186,7 +215,7 @@ func (r *ReverseGeocode) Lookup() map[string]string {
 	case err != nil:
 		log.Fatal(err, "QueryRow")
 	default:
-		log.Println(iNewPlaceID)
+		//log.Println(iNewPlaceID)
 		hasParentPlace = true
 	}
 
@@ -195,8 +224,10 @@ func (r *ReverseGeocode) Lookup() map[string]string {
 		//placeLookup.SetLanguagePreference()
 		placeLookup.SetIncludeAddressDetails(r.addressDetails)
 		placeLookup.SetPlaceID(iPlaceID)
-		return placeLookup.Lookup()
+		dataMap := placeLookup.Lookup()
+		return dataMapToStruct(dataMap)
 	} else {
-		return nil
+		data := DataWithoutDetaild{}
+		return data
 	}
 }

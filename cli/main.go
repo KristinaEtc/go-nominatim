@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"flag"
+	"fmt"
 	_ "github.com/lib/pq"
 	"log"
 	"os"
@@ -27,9 +28,6 @@ type LocationParams struct {
 	config         ConfigDB
 	db             *sql.DB
 }
-
-//var baseURL string = "http://192.168.240.105/nominatim/"
-//"-c nominatim/reverse?format=xml&lat=53.913658&lon=27.600286&zoom=18&addressdetails=1"
 
 func (l *LocationParams) getParams() {
 
@@ -87,6 +85,5 @@ func main() {
 	reverseGeocode.SetLocation(l.lat, l.lon)
 
 	place := reverseGeocode.Lookup()
-	log.Println(place)
-	//reverseGeocode.ShowData()
+	fmt.Println(place)
 }
