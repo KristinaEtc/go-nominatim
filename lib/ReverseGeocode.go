@@ -125,22 +125,22 @@ func (r *ReverseGeocode) Lookup() DataWithoutDetaild {
 
 	var (
 		iMaxRank         = r.iMaxRank
-		fSearchDiam      = 0.004
+		fSearchDiam      = 0.0004
 		fMaxAreaDistance = 1.0
 	)
 
 	var sSQL string
-	var hasPlaceID bool = false
 
 	var (
-		iPlaceID     int
-		iParentPlace int
+		iPlaceID     sql.NullInt64
+		iParentPlace sql.NullInt64
 		iRank        int
 	)
 
 	//log.Printf("Lookup %v\n", r)
+	//var hasParentPlace bool = false
 
-	for fSearchDiam < fMaxAreaDistance && !hasPlaceID {
+	for fSearchDiam < fMaxAreaDistance && !iPlaceID.Valid {
 
 		fSearchDiam = fSearchDiam * 2
 		if fSearchDiam > 2 && iMaxRank > 4 {
@@ -186,44 +186,50 @@ func (r *ReverseGeocode) Lookup() DataWithoutDetaild {
 		err := r.db.QueryRow(sSQL, r.fLon, r.fLat, fSearchDiam, iMaxRank).Scan(&iPlaceID, &iParentPlace, &iRank)
 		switch {
 		case err == sql.ErrNoRows:
-			log.Printf("No found.")
+			log.Printf("Not found.")
 		case err != nil:
-			log.Fatal(err, "qR")
+			log.Fatal(err, "QueryRow")
 		default:
-			//log.Println(iPlaceID, iParentPlace, iRank)
-			hasPlaceID = true
+			log.Println("QueryRow result:", iPlaceID, iParentPlace, iRank)
 		}
 	}
 
-	var hasParentPlace bool = false
-	var iNewPlaceID int
+	log.Println("original place_id:", iPlaceID)
+	var iNewPlaceID sql.NullInt64
 
-	if hasPlaceID && iMaxRank < 28 {
-		if iPlaceID > 28 && hasParentPlace {
+	if iPlaceID.Valid && iMaxRank < 28 {
+		if iRank > 28 && iParentPlace.Valid {
 			iPlaceID = iParentPlace
+			log.Println("use parent place:", iParentPlace)
 		}
-	}
-	sSQL = `select address_place_id 
+
+		sSQL = `select address_place_id 
 				from place_addressline where place_id = $1
 				order by abs(cached_rank_address - $2) 
 				asc,cached_rank_address desc,isaddress desc,distance desc limit 1
 			`
-	err := r.db.QueryRow(sSQL, iPlaceID, iMaxRank).Scan(&iNewPlaceID)
-	switch {
-	case err == sql.ErrNoRows:
-		iNewPlaceID = iPlaceID
-	case err != nil:
-		log.Fatal(err, "QueryRow")
-	default:
-		//log.Println(iNewPlaceID)
-		hasParentPlace = true
+		err := r.db.QueryRow(sSQL, iPlaceID, iMaxRank).Scan(&iNewPlaceID)
+		switch {
+		case err == sql.ErrNoRows:
+			break
+		case err != nil:
+			log.Fatal(err, "QueryRow")
+		default:
+			log.Println("address_place_id:", iNewPlaceID)
+			if iNewPlaceID.Valid {
+				iPlaceID = iNewPlaceID
+			}
+
+		}
 	}
 
-	if hasPlaceID {
+	log.Println("place_id:", iPlaceID)
+
+	if iPlaceID.Valid {
 		placeLookup := NewPlaceLookup(*r.db)
 		//placeLookup.SetLanguagePreference()
 		placeLookup.SetIncludeAddressDetails(r.addressDetails)
-		placeLookup.SetPlaceID(iPlaceID)
+		placeLookup.SetPlaceID(iPlaceID.Int64)
 		dataMap := placeLookup.Lookup()
 		return dataMapToStruct(dataMap)
 	} else {

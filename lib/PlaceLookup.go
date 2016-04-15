@@ -13,7 +13,7 @@ type PlaceLookup struct {
 	maxRank int
 	//langPreOrder   string
 	addressDetails bool
-	placeID        int
+	placeID        int64
 	db             *sql.DB
 }
 
@@ -35,7 +35,7 @@ func (p *PlaceLookup) SetIncludeAddressDetails(addressDetails bool) {
 	p.addressDetails = addressDetails
 }
 
-func (p *PlaceLookup) SetPlaceID(placeID int) {
+func (p *PlaceLookup) SetPlaceID(placeID int64) {
 	p.placeID = placeID
 }
 
@@ -111,6 +111,11 @@ func (p *PlaceLookup) Lookup() (placeData map[string]string) {
 		log.Println("error", err)
 		return
 	}
+	defer rows.Close()
+
+	placeData = map[string]string{}
+	//return placeData
+
 	columns, _ := rows.Columns()
 	count := len(columns)
 	values := make([]interface{}, count)
@@ -126,7 +131,6 @@ func (p *PlaceLookup) Lookup() (placeData map[string]string) {
 	}
 
 	rows.Scan(valuePtrs...)
-	placeData = map[string]string{}
 
 	for colNum, col := range columns {
 		var v interface{}

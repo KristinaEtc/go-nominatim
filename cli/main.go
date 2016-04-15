@@ -5,14 +5,19 @@ import (
 	"database/sql"
 	"encoding/json"
 	"flag"
-	"fmt"
+	//"fmt"
 	_ "github.com/lib/pq"
 	"log"
 	"os"
 	//"strconv"
+	// "testing"
+	//"fmt"
 )
 
 var configFile = "config.json"
+
+var testFile = "test.txt"
+var numOfReq = 100
 
 type ConfigDB struct {
 	DBname, Host, User, Password string
@@ -27,6 +32,7 @@ type LocationParams struct {
 	sqlOpenStr     string
 	config         ConfigDB
 	db             *sql.DB
+	speedTest      bool
 }
 
 func (l *LocationParams) getParams() {
@@ -36,6 +42,7 @@ func (l *LocationParams) getParams() {
 	flag.Float64Var(&l.lon, "b", 27.561916, "log")
 	flag.IntVar(&l.zoom, "z", 18, "zoom")
 	flag.BoolVar(&l.addressDetails, "d", false, "addressDetails")
+	flag.BoolVar(&l.speedTest, "t", false, "speed test")
 
 	flag.Parse()
 	//flag.Parsed()
@@ -69,6 +76,17 @@ func main() {
 
 	//log.Print(l)
 
+	if l.speedTest == false {
+		numOfReq = 1
+	} else {
+		f, err := os.OpenFile(testFile, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0666)
+		if err != nil {
+			log.Fatalf("error opening file: %v", err)
+		}
+		defer f.Close()
+		//log.SetOutput(f)
+	}
+
 	sqlOpenStr := "dbname=" + l.config.DBname +
 		" host=" + l.config.Host +
 		" user=" + l.config.User +
@@ -78,12 +96,18 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer reverseGeocode.Close()
-	//oReverseGeocode.SetLanguagePreference()
-	reverseGeocode.SetIncludeAddressDetails(l.addressDetails)
-	reverseGeocode.SetZoom(l.zoom)
-	reverseGeocode.SetLocation(l.lat, l.lon)
 
-	place := reverseGeocode.Lookup()
-	fmt.Println(place)
+	for i := 0; i < numOfReq; i++ {
+		log.Println("Request:", i)
+
+		//oReverseGeocode.SetLanguagePreference()
+		reverseGeocode.SetIncludeAddressDetails(l.addressDetails)
+		reverseGeocode.SetZoom(l.zoom)
+		reverseGeocode.SetLocation(l.lat, l.lon)
+		place := reverseGeocode.Lookup()
+		log.Println("result:", i, ": ", place)
+	}
+
+	defer reverseGeocode.Close()
+
 }
