@@ -69,6 +69,8 @@ func (l *LocationParams) configurateDB() {
 
 func main() {
 
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
+
 	l := LocationParams{}
 
 	l.configurateDB()
@@ -96,7 +98,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-
+	defer reverseGeocode.Close()
 	for i := 0; i < numOfReq; i++ {
 		log.Println("Request:", i)
 
@@ -107,7 +109,5 @@ func main() {
 		place := reverseGeocode.Lookup()
 		log.Println("result:", i, ": ", place)
 	}
-
-	defer reverseGeocode.Close()
 
 }

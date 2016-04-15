@@ -3,6 +3,7 @@ LIBPATH=$(GOPATH)/src/Nominatim/lib
 
 all: main
 #	./run-psql.sh
+#	go test main.go
 	./main $(CMDARGS) -t=true
 
 one: main

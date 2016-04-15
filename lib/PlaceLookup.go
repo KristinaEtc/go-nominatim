@@ -17,8 +17,8 @@ type PlaceLookup struct {
 	db             *sql.DB
 }
 
-func NewPlaceLookup(db sql.DB) PlaceLookup {
-	p := PlaceLookup{db: &db}
+func NewPlaceLookup(db **sql.DB) PlaceLookup {
+	p := PlaceLookup{db: *db}
 	p.addressDetails = false
 	return p
 }
