@@ -188,7 +188,8 @@ func (r *ReverseGeocode) Lookup() (*DataWithoutDetaild, error) {
 		switch {
 		case err == sql.ErrNoRows:
 			//log.Printf("Not found.")
-			return nil, err
+			//return nil, err
+			continue
 		case err != nil:
 			log.Fatal(err, "QueryRow")
 		default:
