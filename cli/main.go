@@ -6,28 +6,34 @@ import (
 	"encoding/json"
 	"flag"
 	//"fmt"
+	"bufio"
 	_ "github.com/lib/pq"
 	"log"
 	"os"
-	//"strconv"
+	"strconv"
 	// "testing"
 	//"fmt"
+	"strings"
 )
 
 var configFile = "config.json"
 
-var testFile = "test.txt"
-var numOfReq = 100
+var testFile = "test.csv"
+var numOfReq = 0
 
 type ConfigDB struct {
 	DBname, Host, User, Password string
 }
 
 type LocationParams struct {
+	lat  float64
+	lon  float64
+	zoom int
+}
+
+type Params struct {
+	locParams      LocationParams
 	format         string
-	lat            float64
-	lon            float64
-	zoom           int
 	addressDetails bool
 	sqlOpenStr     string
 	config         ConfigDB
@@ -35,14 +41,15 @@ type LocationParams struct {
 	speedTest      bool
 }
 
-func (l *LocationParams) getParams() {
+func (p *Params) getParams() {
 
-	flag.StringVar(&(l.format), "f", "json", "format")
-	flag.Float64Var(&l.lat, "a", 53.902238, "lat")
-	flag.Float64Var(&l.lon, "b", 27.561916, "log")
-	flag.IntVar(&l.zoom, "z", 18, "zoom")
-	flag.BoolVar(&l.addressDetails, "d", false, "addressDetails")
-	flag.BoolVar(&l.speedTest, "t", false, "speed test")
+	flag.StringVar(&(p.format), "f", "json", "format")
+	flag.Float64Var(&p.locParams.lat, "a", 53.902238, "lat")
+	flag.Float64Var(&p.locParams.lon, "b", 27.561916, "log")
+	flag.IntVar(&p.locParams.zoom, "z", 18, "zoom")
+	flag.BoolVar(&p.addressDetails, "d", false, "addressDetails")
+	flag.BoolVar(&p.speedTest, "t", false, "speed test")
+	flag.StringVar(&(testFile), "n", testFile, "name of your test file")
 
 	flag.Parse()
 	//flag.Parsed()
@@ -50,7 +57,7 @@ func (l *LocationParams) getParams() {
 	return
 }
 
-func (l *LocationParams) configurateDB() {
+func (p *Params) configurateDB() {
 
 	file, err := os.Open(configFile)
 	if err != nil {
@@ -63,7 +70,7 @@ func (l *LocationParams) configurateDB() {
 		if err != nil {
 			log.Println("error: ", err)
 		}
-		l.config = configuration
+		p.config = configuration
 	}
 }
 
@@ -71,43 +78,77 @@ func main() {
 
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 
-	l := LocationParams{}
+	p := Params{}
 
-	l.configurateDB()
-	l.getParams()
+	p.configurateDB()
+	p.getParams()
 
-	//log.Print(l)
+	//log.Print(p)
+	var l []LocationParams
 
-	if l.speedTest == false {
+	if p.speedTest == false {
 		numOfReq = 1
+		l = append(l, p.locParams)
 	} else {
-		f, err := os.OpenFile(testFile, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0666)
+		file, err := os.Open(testFile)
 		if err != nil {
-			log.Fatalf("error opening file: %v", err)
+			log.Println(err)
+			os.Exit(1)
 		}
-		defer f.Close()
-		//log.SetOutput(f)
-	}
+		defer file.Close()
 
-	sqlOpenStr := "dbname=" + l.config.DBname +
-		" host=" + l.config.Host +
-		" user=" + l.config.User +
-		" password=" + l.config.Password
+		reader := bufio.NewReader(file)
+		scanner := bufio.NewScanner(reader)
+
+		for scanner.Scan() {
+			locs := scanner.Text()
+
+			locSlice := strings.Split(locs, ",")
+			locStr := LocationParams{}
+			locStr.lat, err = strconv.ParseFloat(locSlice[0], 32)
+			if err != nil {
+				log.Print(err)
+				continue
+			}
+			//log.Println(locStr.lat)
+			locStr.lon, err = strconv.ParseFloat(locSlice[1], 32)
+			if err != nil {
+				log.Print(err)
+				continue
+			}
+			//log.Println(locStr.lon)
+			locStr.zoom, err = strconv.Atoi(locSlice[2])
+			if err != nil {
+				log.Print(err)
+				continue
+			}
+			//log.Println(locStr.zoom)
+			l = append(l, locStr)
+		}
+		for _, data := range l {
+			log.Printf("%f %f %d\n", data.lat, data.lon, data.zoom)
+			numOfReq++
+		}
+	}
+	sqlOpenStr := "dbname=" + p.config.DBname +
+		" host=" + p.config.Host +
+		" user=" + p.config.User +
+		" password=" + p.config.Password
 
 	reverseGeocode, err := Nominatim.NewReverseGeocode(sqlOpenStr)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer reverseGeocode.Close()
-	for i := 0; i < numOfReq; i++ {
-		log.Println("Request:", i)
+	for _, data := range l {
+		//log.Println("Request:", i)
 
 		//oReverseGeocode.SetLanguagePreference()
-		reverseGeocode.SetIncludeAddressDetails(l.addressDetails)
-		reverseGeocode.SetZoom(l.zoom)
-		reverseGeocode.SetLocation(l.lat, l.lon)
+		reverseGeocode.SetIncludeAddressDetails(p.addressDetails)
+		reverseGeocode.SetZoom(data.zoom)
+		reverseGeocode.SetLocation(data.lat, data.lon)
 		place := reverseGeocode.Lookup()
-		log.Println("result:", i, ": ", place)
+		log.Println(place)
 	}
 
 }

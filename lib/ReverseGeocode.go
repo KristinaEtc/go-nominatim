@@ -190,11 +190,11 @@ func (r *ReverseGeocode) Lookup() DataWithoutDetaild {
 		case err != nil:
 			log.Fatal(err, "QueryRow")
 		default:
-			log.Println("QueryRow result:", iPlaceID, iParentPlace, iRank)
+			//log.Println("QueryRow result:", iPlaceID, iParentPlace, iRank)
 		}
 	}
 
-	log.Println("original place_id:", iPlaceID)
+	//log.Println("original place_id:", iPlaceID)
 	var iNewPlaceID sql.NullInt64
 
 	if iPlaceID.Valid && iMaxRank < 28 {
@@ -223,7 +223,7 @@ func (r *ReverseGeocode) Lookup() DataWithoutDetaild {
 		}
 	}
 
-	log.Println("place_id:", iPlaceID)
+	//log.Println("place_id:", iPlaceID)
 
 	if iPlaceID.Valid {
 		placeLookup := NewPlaceLookup(r.db)
