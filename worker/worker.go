@@ -104,7 +104,8 @@ func main() {
 		if place != nil {
 			placeJSON := getLocationJSON(*place)
 			if placeJSON != "" {
-				log.Println(placeJSON)
+				//log.Println(placeJSON)
+				params.sentData(placeJSON, message.NSQDAddress)
 			}
 		}
 		//wg.Done()
@@ -119,10 +120,32 @@ func main() {
 
 }
 
+func (p *Params) sentData(msg string, addr string) {
+
+	log.Println(msg, " ", addr)
+
+	config := nsq.NewConfig()
+	producerPointer, err := nsq.NewProducer(addr, config)
+	if err != nil {
+		log.Println("Couldn't create new worker: ", err)
+	}
+	errPublish := producerPointer.Publish(addr, []byte(msg))
+	if errPublish != nil {
+		log.Println("Couldn't connect: ", errPublish)
+	}
+	producerPointer.Stop()
+}
+
 func (p *Params) addCoordinatesToStruct(rawMsg string) {
 
 	var err error
 	coordinates := strings.Split(rawMsg, ",")
+
+	if len(coordinates) < 3 {
+		log.Println("Got incorrect request: ignore")
+		return
+	}
+
 	p.locParams.lat, err = strconv.ParseFloat(coordinates[0], 32)
 	if err != nil {
 		log.Print(err)
@@ -139,6 +162,7 @@ func (p *Params) addCoordinatesToStruct(rawMsg string) {
 		log.Print(err)
 		return
 	}
+
 	//log.Printf("-%f-%f-%d-", p.locParams.lat, p.locParams.lon, p.locParams.zoom)
 }
 
