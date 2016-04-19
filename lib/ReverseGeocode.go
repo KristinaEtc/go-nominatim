@@ -18,32 +18,32 @@ type ReverseGeocode struct {
 	db             *sql.DB
 }
 
-type DataWithoutDetaild struct {
-	place_id    string
-	osm_type    string
-	osm_id      string
-	lat         string
-	lon         string
-	langaddress string
+type DataWithoutDetails struct {
+	Place_id    string `Place_id`
+	Osm_type    string `Osm_type`
+	Osm_id      string `Osm_id`
+	Lat         string `Lat`
+	Lon         string `Lon`
+	Langaddress string `Langaddress`
 }
 
-func (d DataWithoutDetaild) String() string {
-	var str = "\nplace_id: " + d.place_id +
-		"\nosm_id: " + d.osm_id +
-		"\nosm_type: " + d.osm_type +
-		"\nlat: " + d.lat +
-		"\nlon: " + d.lon +
-		"\nlangaddress: " + d.langaddress + "\n"
+func (d DataWithoutDetails) String() string {
+	var str = "\nplace_id: " + d.Place_id +
+		"\nosm_id: " + d.Osm_id +
+		"\nosm_type: " + d.Osm_type +
+		"\nlat: " + d.Lat +
+		"\nlon: " + d.Lon +
+		"\nlangaddress: " + d.Langaddress + "\n"
 	return str
 }
 
-func dataMapToStruct(m map[string]string) *DataWithoutDetaild {
-	dataStr := DataWithoutDetaild{place_id: m["place_id"],
-		osm_id:      m["osm_id"],
-		osm_type:    m["osm_type"],
-		lat:         m["lat"],
-		lon:         m["lon"],
-		langaddress: m["langaddress"],
+func dataMapToStruct(m map[string]string) *DataWithoutDetails {
+	dataStr := DataWithoutDetails{Place_id: m["place_id"],
+		Osm_id:      m["osm_id"],
+		Osm_type:    m["osm_type"],
+		Lat:         m["lat"],
+		Lon:         m["lon"],
+		Langaddress: m["langaddress"],
 	}
 	return &dataStr
 }
@@ -116,7 +116,7 @@ func (r *ReverseGeocode) SetZoom(iZoom int) {
 	}*/
 }
 
-func (r *ReverseGeocode) Lookup() (*DataWithoutDetaild, error) {
+func (r *ReverseGeocode) Lookup() (*DataWithoutDetails, error) {
 	//sLon := strconv.FormatFloat(r.fLon, 'f', 6, 64)
 	//sLat := strconv.FormatFloat(r.fLat, 'f', 6, 64)
 

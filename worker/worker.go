@@ -98,46 +98,15 @@ func main() {
 		rawMsg := string(message.Body[:len(message.Body)])
 		log.Printf("Got a message: %s", rawMsg)
 
-		msgParted := strings.Split(rawMsg, ",")
-		params.locParams.lat, err = strconv.ParseFloat(msgParted[0], 32)
-		if err != nil {
-			log.Print(err)
-			return nil
-		}
-		params.locParams.lon, err = strconv.ParseFloat(msgParted[1], 32)
-		if err != nil {
-			log.Print(err)
-			return nil
-		}
+		params.addCoordinatesToStruct(rawMsg)
+		place := params.getLocationFromNominatim()
 
-		params.locParams.zoom, err = strconv.Atoi(msgParted[2])
-		if err != nil {
-			log.Print(err)
-			return nil
+		if place != nil {
+			placeJSON := getLocationJSON(*place)
+			if placeJSON != "" {
+				log.Println(placeJSON)
+			}
 		}
-		//log.Printf("-%f-%f-%d-", params.locParams.lat, params.locParams.lon, params.locParams.zoom)
-
-		sqlOpenStr := "dbname=" + params.config.DBname +
-			" host=" + params.config.Host +
-			" user=" + params.config.User +
-			" password=" + params.config.Password
-
-		reverseGeocode, err := Nominatim.NewReverseGeocode(sqlOpenStr)
-		if err != nil {
-			log.Fatal(err)
-		}
-		defer reverseGeocode.Close()
-
-		//oReverseGeocode.SetLanguagePreference()
-		reverseGeocode.SetIncludeAddressDetails(params.addressDetails)
-		reverseGeocode.SetZoom(params.locParams.zoom)
-		reverseGeocode.SetLocation(params.locParams.lat, params.locParams.lon)
-		place, err := reverseGeocode.Lookup()
-		if err != nil {
-			return nil
-		}
-		log.Println(place)
-
 		//wg.Done()
 		return nil
 	}))
@@ -148,4 +117,65 @@ func main() {
 	}
 	wg.Wait()
 
+}
+
+func (p *Params) addCoordinatesToStruct(rawMsg string) {
+
+	var err error
+	coordinates := strings.Split(rawMsg, ",")
+	p.locParams.lat, err = strconv.ParseFloat(coordinates[0], 32)
+	if err != nil {
+		log.Print(err)
+		return
+	}
+	p.locParams.lon, err = strconv.ParseFloat(coordinates[1], 32)
+	if err != nil {
+		log.Print(err)
+		return
+	}
+
+	p.locParams.zoom, err = strconv.Atoi(coordinates[2])
+	if err != nil {
+		log.Print(err)
+		return
+	}
+	//log.Printf("-%f-%f-%d-", p.locParams.lat, p.locParams.lon, p.locParams.zoom)
+}
+
+func (p *Params) getLocationFromNominatim() *Nominatim.DataWithoutDetails {
+
+	sqlOpenStr := "dbname=" + p.config.DBname +
+		" host=" + p.config.Host +
+		" user=" + p.config.User +
+		" password=" + p.config.Password
+
+	reverseGeocode, err := Nominatim.NewReverseGeocode(sqlOpenStr)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer reverseGeocode.Close()
+
+	//oReverseGeocode.SetLanguagePreference()
+	reverseGeocode.SetIncludeAddressDetails(p.addressDetails)
+	reverseGeocode.SetZoom(p.locParams.zoom)
+	reverseGeocode.SetLocation(p.locParams.lat, p.locParams.lon)
+	place, err := reverseGeocode.Lookup()
+	if err != nil {
+		return nil
+	}
+	//log.Printf("%v", *place)
+	return place
+}
+
+func getLocationJSON(data Nominatim.DataWithoutDetails) string {
+
+	dataJSON, err := json.Marshal(data)
+	if err != nil {
+		log.Println(err)
+		return ""
+	}
+	//log.Println("\n\nsdfnsdfsdfsdf\n\n")
+	//os.Stdout.Write(dataJSON)
+	//log.Println(dataJSON)
+	return string(dataJSON)
 }
