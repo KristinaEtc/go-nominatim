@@ -218,15 +218,13 @@ func (r *ReverseGeocode) Lookup() (*DataWithoutDetaild, error) {
 		case err != nil:
 			log.Fatal("QueryRow", err)
 		default:
-			log.Println("address_place_id:", iNewPlaceID)
+			//log.Println("address_place_id:", iNewPlaceID)
 			if iNewPlaceID.Valid {
 				iPlaceID = iNewPlaceID
 			}
 
 		}
 	}
-
-	//log.Println("place_id:", iPlaceID)
 
 	if iPlaceID.Valid {
 		placeLookup := NewPlaceLookup(r.db)

@@ -1,27 +1,20 @@
 package main
 
 import (
-	"encoding/json"
-	//"Nominatim/lib"
+	"Nominatim/lib"
 	"database/sql"
-	//z"encoding/json"
+	"encoding/json"
 	"flag"
 	"github.com/bitly/go-nsq"
-	"sync"
-	//"fmt"
-	//"bufio"
 	_ "github.com/lib/pq"
 	"log"
 	"os"
 	"strconv"
-	// "testing"
-	//"fmt"
 	"strings"
+	"sync"
 )
 
 var configFile = "../cli/config.json"
-
-//var testFile = "test.csvt"
 
 var numOfReq = 0
 
@@ -49,7 +42,6 @@ type Params struct {
 	sqlOpenStr     string
 	config         ConfigDB
 	db             *sql.DB
-	// speedTest      bool
 }
 
 func (p *Params) configurateDB() {
@@ -123,8 +115,28 @@ func main() {
 			log.Print(err)
 			return nil
 		}
+		//log.Printf("-%f-%f-%d-", params.locParams.lat, params.locParams.lon, params.locParams.zoom)
 
-		log.Printf("-%f-%f-%d-", params.locParams.lat, params.locParams.lon, params.locParams.zoom)
+		sqlOpenStr := "dbname=" + params.config.DBname +
+			" host=" + params.config.Host +
+			" user=" + params.config.User +
+			" password=" + params.config.Password
+
+		reverseGeocode, err := Nominatim.NewReverseGeocode(sqlOpenStr)
+		if err != nil {
+			log.Fatal(err)
+		}
+		defer reverseGeocode.Close()
+
+		//oReverseGeocode.SetLanguagePreference()
+		reverseGeocode.SetIncludeAddressDetails(params.addressDetails)
+		reverseGeocode.SetZoom(params.locParams.zoom)
+		reverseGeocode.SetLocation(params.locParams.lat, params.locParams.lon)
+		place, err := reverseGeocode.Lookup()
+		if err != nil {
+			return nil
+		}
+		log.Println(place)
 
 		//wg.Done()
 		return nil
