@@ -1,0 +1,2 @@
+CMDARGS=-a=53.9009279 -b=27.5592055 -z=18
+./test-client $(CMDARGS)

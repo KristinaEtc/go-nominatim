@@ -9,8 +9,8 @@ import (
 	_ "github.com/lib/pq"
 	"log"
 	"os"
-	"strconv"
-	"strings"
+	//"strconv"
+	//"strings"
 	"sync"
 )
 
@@ -25,18 +25,19 @@ type ConfigDB struct {
 const (
 	HOST               string = "localhost"
 	PORT               string = ":4150"
-	topicToSubscribe   string = "topicName"
-	channelToSubscribe string = "channelName"
+	topicToSubscribe   string = "main"
+	channelToSubscribe string = "main"
 )
 
-type LocationParams struct {
-	lat  float64
-	lon  float64
-	zoom int
+type Req struct {
+	Lat      float64 `json: Lat`
+	Lon      float64 `json:Lon`
+	Zoom     int     `json:Zoom`
+	ClientID string  `json:ClientID`
 }
 
 type Params struct {
-	locParams      LocationParams
+	clientReq      Req
 	format         string
 	addressDetails bool
 	sqlOpenStr     string
@@ -65,11 +66,10 @@ func (p *Params) configurateDB() {
 
 func (p *Params) getParams() {
 
-	//testing arguments for valid
 	flag.Parsed()
 
 	flag.StringVar(&(p.format), "f", "json", "format")
-	flag.IntVar(&p.locParams.zoom, "z", 18, "zoom")
+	flag.IntVar(&p.clientReq.Zoom, "z", 18, "zoom")
 	flag.BoolVar(&p.addressDetails, "d", false, "addressDetails")
 
 	flag.Parse()
@@ -77,13 +77,7 @@ func (p *Params) getParams() {
 	return
 }
 
-func main() {
-
-	log.SetFlags(log.LstdFlags | log.Lshortfile)
-
-	params := Params{}
-	params.configurateDB()
-	params.getParams()
+func (params *Params) locationSearch() {
 
 	wg := &sync.WaitGroup{}
 	wg.Add(1)
@@ -96,19 +90,31 @@ func main() {
 	}
 	consumerPointer.AddHandler(nsq.HandlerFunc(func(message *nsq.Message) error {
 		rawMsg := string(message.Body[:len(message.Body)])
-		log.Printf("Got a message: %s", rawMsg)
+		log.Printf("Got request: %s", rawMsg)
 
-		params.addCoordinatesToStruct(rawMsg)
-		place := params.getLocationFromNominatim()
-
-		if place != nil {
-			placeJSON := getLocationJSON(*place)
-			if placeJSON != "" {
-				//log.Println(placeJSON)
-				params.sentData(placeJSON, message.NSQDAddress)
-			}
+		err := params.addCoordinatesToStruct(message.Body)
+		if err != nil {
+			log.Println(err)
+			return err
 		}
-		//wg.Done()
+		place, err := params.getLocationFromNominatim()
+		if err != nil {
+			log.Println(err)
+			return err
+		}
+
+		placeJSON, err := getLocationJSON(*place)
+		if err != nil {
+			log.Println(err)
+			return err
+		}
+
+		err = params.sentData(placeJSON)
+		if err != nil {
+			log.Println(err)
+			return err
+		}
+
 		return nil
 	}))
 
@@ -117,56 +123,47 @@ func main() {
 		log.Panic("Could not connect")
 	}
 	wg.Wait()
-
 }
 
-func (p *Params) sentData(msg string, addr string) {
+func main() {
 
-	log.Println(msg, " ", addr)
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
+
+	params := Params{}
+	params.configurateDB()
+	params.getParams()
+	params.locationSearch()
+}
+
+func (p *Params) sentData(msg string) error {
 
 	config := nsq.NewConfig()
-	producerPointer, err := nsq.NewProducer(addr, config)
+	producerPointer, err := nsq.NewProducer(HOST+PORT, config)
 	if err != nil {
 		log.Println("Couldn't create new worker: ", err)
+		return err
 	}
-	errPublish := producerPointer.Publish(addr, []byte(msg))
+	errPublish := producerPointer.Publish(p.clientReq.ClientID, []byte(msg))
 	if errPublish != nil {
 		log.Println("Couldn't connect: ", errPublish)
+		return err
 	}
 	producerPointer.Stop()
+	return nil
 }
 
-func (p *Params) addCoordinatesToStruct(rawMsg string) {
+func (p *Params) addCoordinatesToStruct(data []byte) error {
 
-	var err error
-	coordinates := strings.Split(rawMsg, ",")
-
-	if len(coordinates) < 3 {
-		log.Println("Got incorrect request: ignore")
-		return
+	location := Req{}
+	if err := json.Unmarshal(data, &location); err != nil {
+		return err
 	}
+	p.clientReq = location
 
-	p.locParams.lat, err = strconv.ParseFloat(coordinates[0], 32)
-	if err != nil {
-		log.Print(err)
-		return
-	}
-	p.locParams.lon, err = strconv.ParseFloat(coordinates[1], 32)
-	if err != nil {
-		log.Print(err)
-		return
-	}
-
-	p.locParams.zoom, err = strconv.Atoi(coordinates[2])
-	if err != nil {
-		log.Print(err)
-		return
-	}
-
-	//log.Printf("-%f-%f-%d-", p.locParams.lat, p.locParams.lon, p.locParams.zoom)
+	return nil
 }
 
-func (p *Params) getLocationFromNominatim() *Nominatim.DataWithoutDetails {
+func (p *Params) getLocationFromNominatim() (*Nominatim.DataWithoutDetails, error) {
 
 	sqlOpenStr := "dbname=" + p.config.DBname +
 		" host=" + p.config.Host +
@@ -181,25 +178,22 @@ func (p *Params) getLocationFromNominatim() *Nominatim.DataWithoutDetails {
 
 	//oReverseGeocode.SetLanguagePreference()
 	reverseGeocode.SetIncludeAddressDetails(p.addressDetails)
-	reverseGeocode.SetZoom(p.locParams.zoom)
-	reverseGeocode.SetLocation(p.locParams.lat, p.locParams.lon)
+	reverseGeocode.SetZoom(p.clientReq.Zoom)
+	reverseGeocode.SetLocation(p.clientReq.Lat, p.clientReq.Lon)
 	place, err := reverseGeocode.Lookup()
 	if err != nil {
-		return nil
+		return nil, err
 	}
-	//log.Printf("%v", *place)
-	return place
+
+	return place, nil
 }
 
-func getLocationJSON(data Nominatim.DataWithoutDetails) string {
+func getLocationJSON(data Nominatim.DataWithoutDetails) (string, error) {
 
 	dataJSON, err := json.Marshal(data)
 	if err != nil {
 		log.Println(err)
-		return ""
+		return "", err
 	}
-	//log.Println("\n\nsdfnsdfsdfsdf\n\n")
-	//os.Stdout.Write(dataJSON)
-	//log.Println(dataJSON)
-	return string(dataJSON)
+	return string(dataJSON), nil
 }

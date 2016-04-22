@@ -4,8 +4,6 @@ all:
 close:
 	pkill nsqd
 	pkill nsqlookupd
-	pkill nsqadmin
-
-clean: 
+	pkill nsqadmin 
 	rm *.dat
 
