@@ -5,18 +5,28 @@ import (
 	"database/sql"
 	"encoding/json"
 	"flag"
+	l4g "github.com/alecthomas/log4go"
 	"github.com/bitly/go-nsq"
 	_ "github.com/lib/pq"
-	"log"
 	"os"
-	//"strconv"
-	//"strings"
 	"sync"
 )
 
 var configFile = "../cli/config.json"
 
+var log l4g.Logger
+
 var numOfReq = 0
+var log4F = log4goFacade{&log}
+
+type log4goFacade struct {
+	log *l4g.Logger
+}
+
+func (l log4goFacade) Output(calldepth int, s string) error {
+	l.log.Debug("(nsq-go) %s", s)
+	return nil
+}
 
 type ConfigDB struct {
 	DBname, Host, User, Password string
@@ -27,6 +37,7 @@ const (
 	PORT               string = ":4150"
 	topicToSubscribe   string = "main"
 	channelToSubscribe string = "main"
+	LOGFILE            string = "prod-logfile.txt"
 )
 
 type Req struct {
@@ -49,7 +60,7 @@ func (p *Params) configurateDB() {
 
 	file, err := os.Open(configFile)
 	if err != nil {
-		log.Printf("No configurate file")
+		log.Error("No configurate file")
 	} else {
 
 		defer file.Close()
@@ -58,7 +69,7 @@ func (p *Params) configurateDB() {
 
 		err := decoder.Decode(&configuration)
 		if err != nil {
-			log.Println("error: ", err)
+			log.Error("error: ", err)
 		}
 		p.config = configuration
 	}
@@ -85,33 +96,33 @@ func (params *Params) locationSearch() {
 	config := nsq.NewConfig()
 	consumerPointer, err := nsq.NewConsumer(topicToSubscribe, channelToSubscribe, config)
 	if err != nil {
-		log.Panic(err)
+		log.Critical(err)
 		return
 	}
 	consumerPointer.AddHandler(nsq.HandlerFunc(func(message *nsq.Message) error {
 		rawMsg := string(message.Body[:len(message.Body)])
-		log.Printf("Got request: %s", rawMsg)
+		log.Info("Got request: %s", rawMsg)
 
 		err := params.addCoordinatesToStruct(message.Body)
 		if err != nil {
-			log.Println(err)
+			log.Error(err)
 			return err
 		}
 		place, err := params.getLocationFromNominatim()
 		if err != nil {
-			log.Println(err)
+			log.Error(err)
 			return err
 		}
 
 		placeJSON, err := getLocationJSON(*place)
 		if err != nil {
-			log.Println(err)
+			log.Error(err)
 			return err
 		}
 
 		err = params.sentData(placeJSON)
 		if err != nil {
-			log.Println(err)
+			log.Error(err)
 			return err
 		}
 
@@ -120,14 +131,18 @@ func (params *Params) locationSearch() {
 
 	err = consumerPointer.ConnectToNSQD(HOST + PORT)
 	if err != nil {
-		log.Panic("Could not connect")
+		log.Critical("Could not connect")
+		os.Exit(1)
 	}
 	wg.Wait()
 }
 
 func main() {
 
-	log.SetFlags(log.LstdFlags | log.Lshortfile)
+	log = l4g.NewLogger()
+
+	log.AddFilter("stdout", l4g.INFO, l4g.NewConsoleLogWriter())
+	log.AddFilter("file", l4g.DEBUG, l4g.NewFileLogWriter(LOGFILE, true))
 
 	params := Params{}
 	params.configurateDB()
@@ -140,12 +155,14 @@ func (p *Params) sentData(msg string) error {
 	config := nsq.NewConfig()
 	producerPointer, err := nsq.NewProducer(HOST+PORT, config)
 	if err != nil {
-		log.Println("Couldn't create new worker: ", err)
+		log.Error("Couldn't create new worker: ", err)
 		return err
 	}
+	log4F := log4goFacade{&log}
+	producerPointer.SetLogger(log4F, nsq.LogLevelInfo)
 	errPublish := producerPointer.Publish(p.clientReq.ClientID, []byte(msg))
 	if errPublish != nil {
-		log.Println("Couldn't connect: ", errPublish)
+		log.Error("Couldn't connect: ", errPublish)
 		return err
 	}
 	producerPointer.Stop()
@@ -172,7 +189,8 @@ func (p *Params) getLocationFromNominatim() (*Nominatim.DataWithoutDetails, erro
 
 	reverseGeocode, err := Nominatim.NewReverseGeocode(sqlOpenStr)
 	if err != nil {
-		log.Fatal(err)
+		log.Critical(err)
+		os.Exit(1)
 	}
 	defer reverseGeocode.Close()
 
@@ -192,7 +210,7 @@ func getLocationJSON(data Nominatim.DataWithoutDetails) (string, error) {
 
 	dataJSON, err := json.Marshal(data)
 	if err != nil {
-		log.Println(err)
+		log.Error(err)
 		return "", err
 	}
 	return string(dataJSON), nil

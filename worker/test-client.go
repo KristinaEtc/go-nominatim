@@ -4,8 +4,9 @@ import (
 	"bufio"
 	"encoding/json"
 	"flag"
+	l4g "github.com/alecthomas/log4go"
 	"github.com/bitly/go-nsq"
-	"log"
+	//"log"
 	"os"
 	"strconv"
 	"strings"
@@ -24,6 +25,7 @@ var (
 	numOfReq  = 10000
 	speedTest = false
 	testFile  = "test.csv"
+	LOGFILE   = "logfile.txt"
 )
 
 type Req struct {
@@ -59,33 +61,39 @@ func (r *Req) getLocationJSON() (string, error) {
 
 func main() {
 
-	log.SetFlags(log.LstdFlags | log.Lshortfile)
+	log := l4g.NewLogger()
+
+	log.AddFilter("stdout", l4g.INFO, l4g.NewConsoleLogWriter())
+	log.AddFilter("file", l4g.DEBUG, l4g.NewFileLogWriter(LOGFILE, true))
+
+	defer log.Close()
+	//log.SetFlags(log.LstdFlags | log.Lshortfile)
 
 	var reqInJSON []string
 
 	r := Req{ClientID: ClientID}
 	r.getParams()
-	log.Println(r)
+	//log.Info(r)
 
 	speedTest = true
 
 	if speedTest == false {
-		log.Println("speedTest == false\n\n")
+		log.Info("speedTest == false\n\n")
 		numOfReq = 1
 
 		jsonReq, err := r.getLocationJSON()
 		if err != nil {
-			log.Println(err)
+			log.Error(err)
 			return
 		}
 		reqInJSON = append(reqInJSON, jsonReq)
-		log.Println(jsonReq)
+		log.Info(jsonReq)
 
 	} else {
 
 		file, err := os.Open(testFile)
 		if err != nil {
-			log.Println(err)
+			log.Error(err)
 			os.Exit(1)
 		}
 		defer file.Close()
@@ -100,25 +108,25 @@ func main() {
 			r := Req{}
 			r.Lat, err = strconv.ParseFloat(locSlice[0], 32)
 			if err != nil {
-				log.Print(err)
+				log.Error(err)
 				continue
 			}
 
 			r.Lon, err = strconv.ParseFloat(locSlice[1], 32)
 			if err != nil {
-				log.Print(err)
+				log.Error(err)
 				continue
 			}
 			r.Zoom, err = strconv.Atoi(locSlice[2])
 			if err != nil {
-				log.Print(err)
+				log.Error(err)
 				continue
 			}
 			r.ClientID = ClientID
 
 			jsonReq, err := r.getLocationJSON()
 			if err != nil {
-				log.Println(err)
+				log.Error(err)
 				return
 			}
 			reqInJSON = append(reqInJSON, jsonReq)
@@ -127,12 +135,12 @@ func main() {
 
 	wg := &sync.WaitGroup{}
 
-	listener(wg)
+	listener(wg, log)
 
 	config := nsq.NewConfig()
 	producerPointer, err := nsq.NewProducer(HOST+PORT, config)
 	if err != nil {
-		log.Println("Couldn't create new worker: ", err)
+		log.Error("Couldn't create new worker: ", err)
 		os.Exit(1)
 	}
 
@@ -142,7 +150,7 @@ func main() {
 
 		errPublish := producerPointer.Publish(topicToSubscribe, []byte(data))
 		if errPublish != nil {
-			log.Println("Couldn't connect: ", errPublish)
+			log.Error("Couldn't connect: ", errPublish)
 
 			errors++
 			continue
@@ -153,26 +161,27 @@ func main() {
 	producerPointer.Stop()
 	wg.Wait()
 
-	log.Println("found:", found, "errors:", errors)
+	log.Info("found: %d errors %d:", found, errors)
 }
 
-func listener(wg *sync.WaitGroup) {
+func listener(wg *sync.WaitGroup, log l4g.Logger) {
 
 	config := nsq.NewConfig()
 	q, err := nsq.NewConsumer(ClientID, ClientID, config)
 	if err != nil {
-		log.Println("Could not create client: ", err)
+		log.Error("Could not create client: ", err)
 	}
 	q.AddHandler(nsq.HandlerFunc(func(message *nsq.Message) error {
 		rawMsg := string(message.Body[:len(message.Body)])
 
-		log.Printf("Got a message: %v, %s", rawMsg, message.NSQDAddress)
+		log.Info("Got a message: %v, %s\n", rawMsg, message.NSQDAddress)
 		wg.Done()
 		return nil
 	}))
 	err = q.ConnectToNSQD(HOST + PORT)
 	if err != nil {
-		log.Panic("Could not connect")
+		log.Critical("Could not connect")
+		os.Exit(1)
 	}
 
 }
