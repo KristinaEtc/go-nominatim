@@ -3,3 +3,7 @@ cli/main
 cli/test.txt
 cli/test.csv
 worker/test.csv
+worker/logfile*
+worker/test-client
+worker/worker
+

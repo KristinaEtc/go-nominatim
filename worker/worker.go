@@ -37,7 +37,7 @@ const (
 	PORT               string = ":4150"
 	topicToSubscribe   string = "main"
 	channelToSubscribe string = "main"
-	LOGFILE            string = "prod-logfile.txt"
+	LOGFILE            string = "/home/k/go-worker.log"
 )
 
 type Req struct {
