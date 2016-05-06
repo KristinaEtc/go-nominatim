@@ -12,7 +12,7 @@ import (
 	"sync"
 )
 
-var configFile = "../cli/config.json"
+var configFile = "/opt/go-nsq/config.json"
 
 var log l4g.Logger
 
