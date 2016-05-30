@@ -91,7 +91,7 @@ func (p *Params) configurateDB() {
 	log.Info("db configurate done")
 }
 
-func (p *Params) locationSearch(rawMsg []byte) ([]byte, *string, error) {
+func (p *Params) locationSearch(rawMsg []byte, geocode *Nominatim.ReverseGeocode) ([]byte, *string, error) {
 
 	log.Debug("Got request: %s", rawMsg)
 
@@ -101,7 +101,7 @@ func (p *Params) locationSearch(rawMsg []byte) ([]byte, *string, error) {
 		return nil, nil, err
 	}
 	log.Debug("addCoordinatesToStruct done")
-	place, err := p.getLocationFromNominatim()
+	place, err := p.getLocationFromNominatim(geocode)
 	if err != nil {
 		log.Error(err)
 		return nil, nil, err
@@ -116,7 +116,7 @@ func (p *Params) locationSearch(rawMsg []byte) ([]byte, *string, error) {
 	log.Debug("getLocationJSON done")
 
 	whoToSent := p.clientReq.ClientID
-	log.Info("%s %d", p.clientReq.ClientID, p.clientReq.ID)
+	//log.Info("%s %d", p.clientReq.ClientID, p.clientReq.ID)
 
 	return placeJSON, &whoToSent, nil
 
@@ -133,19 +133,7 @@ func (p *Params) addCoordinatesToStruct(data []byte) error {
 	return nil
 }
 
-func (p *Params) getLocationFromNominatim() (*Nominatim.DataWithoutDetails, error) {
-
-	sqlOpenStr := "dbname=" + p.config.DBname +
-		" host=" + p.config.Host +
-		" user=" + p.config.User +
-		" password=" + p.config.Password
-
-	reverseGeocode, err := Nominatim.NewReverseGeocode(sqlOpenStr)
-	if err != nil {
-		log.Critical(err)
-		os.Exit(1)
-	}
-	defer reverseGeocode.Close()
+func (p *Params) getLocationFromNominatim(reverseGeocode *Nominatim.ReverseGeocode) (*Nominatim.DataWithoutDetails, error) {
 
 	//oReverseGeocode.SetLanguagePreference()
 	reverseGeocode.SetIncludeAddressDetails(p.addressDetails)
@@ -176,14 +164,33 @@ func requestLoop(subscribed chan bool, p *Params) {
 		stop <- true
 	}()
 
-	conn, err := stomp.Dial("tcp", *serverAddr, options...)
+	sqlOpenStr := "dbname=" + p.config.DBname +
+		" host=" + p.config.Host +
+		" user=" + p.config.User +
+		" password=" + p.config.Password
+
+	reverseGeocode, err := Nominatim.NewReverseGeocode(sqlOpenStr)
+	if err != nil {
+		log.Critical(err)
+		os.Exit(1)
+	}
+	defer reverseGeocode.Close()
+
+	connSubsc, err := stomp.Dial("tcp", *serverAddr, options...)
 
 	if err != nil {
 		println("cannot connect to server", err.Error())
 		return
 	}
 
-	sub, err := conn.Subscribe(*queueName, stomp.AckAuto)
+	connSend, err := stomp.Dial("tcp", *serverAddr, options...)
+
+	if err != nil {
+		println("cannot connect to server", err.Error())
+		return
+	}
+
+	sub, err := connSubsc.Subscribe(*queueName, stomp.AckAuto)
 	if err != nil {
 		println("cannot subscribe to", *queueName, err.Error())
 		return
@@ -197,21 +204,24 @@ func requestLoop(subscribed chan bool, p *Params) {
 			return
 		}
 
-		reqJSON, whoToSent, err := p.locationSearch(msg.Body)
+		reqJSON := msg.Body
+		//log.Info(string(reqJSON))
+
+		reqJSON, whoToSent, err := p.locationSearch(msg.Body, reverseGeocode)
 		if err != nil {
 			log.Error("Error: converting request to json")
 			return
 		}
 
-		log.Info("whoToSent %s", *whoToSent)
+		//log.Info("whoToSent %s", *whoToSent)
 
-		err = conn.Send("/queue/"+*whoToSent, "text/plain",
+		err = connSend.Send("/queue/"+*whoToSent, "text/plain",
 			[]byte(reqJSON), nil...)
 		if err != nil {
 			println("failed to send to server", err)
 			return
 		}
-		log.Info("Sending finished")
+		//log.Info("Sending finished")
 	}
 }
 

@@ -11,7 +11,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	//"time"
+	//	"time"
 )
 
 var log l4g.Logger = l4g.NewLogger()
@@ -72,13 +72,26 @@ func sendMessages() {
 		stop <- true
 	}()
 
-	conn, err := stomp.Dial("tcp", *serverAddr, options...)
+	_, err := stomp.Dial("tcp", *serverAddr, options...)
 	if err != nil {
 		log.Error("cannot connect to server", err.Error())
 		return
 	}
 
 	fs, err := NewFileScanner(testFile)
+	if err != nil {
+		log.Error(err)
+		os.Exit(1)
+	}
+	defer fs.Close()
+
+	conn2, err := stomp.Dial("tcp", *serverAddr, options...)
+	if err != nil {
+		log.Error("cannot connect to server", err.Error())
+		return
+	}
+
+	fs, err = NewFileScanner(testFile)
 	if err != nil {
 		log.Error(err)
 		os.Exit(1)
@@ -93,7 +106,7 @@ func sendMessages() {
 	for fs.Scanner.Scan() {
 		locs := fs.Scanner.Text()
 		//log.Info("locs: %s", locs)
-		//time.Sleep(1000 * time.Millisecond)
+		//time.Sleep(100 * time.Millisecond)
 		reqInJSON, err := MakeReq(locs, clientID, i, log)
 		if err != nil {
 			log.Error("Could not get coordinates in JSON: wrong format")
@@ -103,7 +116,7 @@ func sendMessages() {
 
 		//time.Sleep(1000 * time.Millisecond)
 
-		err = conn.Send(*destination, "text/json", []byte(*reqInJSON), nil...)
+		err = conn2.Send(*destination, "text/json", []byte(*reqInJSON), nil...)
 		if err != nil {
 			log.Error("failed to send to server", err)
 			return
@@ -131,6 +144,7 @@ func recvMessages(subscribed chan bool) {
 	}
 	close(subscribed)
 
+	var i = 0
 	for {
 		msg := <-sub.C
 		if msg == nil {
@@ -138,7 +152,12 @@ func recvMessages(subscribed chan bool) {
 			return
 		}
 		actualText := string(msg.Body)
-		log.Info("Got message:", actualText)
+		//if strconv.Atoi(string)
+		if i%20 == 0 {
+			log.Info("Got message: %s", actualText)
+		}
+
+		i++
 	}
 }
 
