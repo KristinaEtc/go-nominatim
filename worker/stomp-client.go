@@ -11,7 +11,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"time"
+	//"time"
 )
 
 var log l4g.Logger = l4g.NewLogger()
@@ -88,24 +88,27 @@ func sendMessages() {
 	//пустой слайс или массив из одного нила
 	fs.Scanner = fs.GetScanner()
 
+	i := 0
+
 	for fs.Scanner.Scan() {
 		locs := fs.Scanner.Text()
 		//log.Info("locs: %s", locs)
-		time.Sleep(1000 * time.Millisecond)
-		reqInJSON, err := MakeReq(locs, clientID, log)
+		//time.Sleep(1000 * time.Millisecond)
+		reqInJSON, err := MakeReq(locs, clientID, i, log)
 		if err != nil {
 			log.Error("Could not get coordinates in JSON: wrong format")
 			continue
 		}
 		//log.Info("reqInJSON: %s", *reqInJSON)
 
-		time.Sleep(1000 * time.Millisecond)
+		//time.Sleep(1000 * time.Millisecond)
 
 		err = conn.Send(*destination, "text/json", []byte(*reqInJSON), nil...)
 		if err != nil {
 			log.Error("failed to send to server", err)
 			return
 		}
+		i++
 
 	}
 }
@@ -144,6 +147,7 @@ type Req struct {
 	Lon      float64 `json:Lon`
 	Zoom     int     `json:Zoom`
 	ClientID string  `json:ClientID`
+	ID       int     `json:ID`
 }
 
 func (r *Req) getLocationJSON() (string, error) {
@@ -159,7 +163,7 @@ func (r *Req) getLocationJSON() (string, error) {
 //	Error() string
 //}
 
-func MakeReq(parameters, clientID string, log l4g.Logger) (reqInJSON *string, err error) {
+func MakeReq(parameters, clientID string, ID int, log l4g.Logger) (reqInJSON *string, err error) {
 
 	locSlice := strings.Split(parameters, ",")
 	r := Req{}
@@ -179,6 +183,8 @@ func MakeReq(parameters, clientID string, log l4g.Logger) (reqInJSON *string, er
 		return nil, err
 	}
 	r.ClientID = clientID
+
+	r.ID = ID
 
 	jsonReq, err := r.getLocationJSON()
 	if err != nil {

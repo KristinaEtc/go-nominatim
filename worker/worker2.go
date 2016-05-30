@@ -59,6 +59,7 @@ type Req struct {
 	Lon      float64 `json:Lon`
 	Zoom     int     `json:Zoom`
 	ClientID string  `json:ClientID`
+	ID       int     `json:ID`
 }
 
 type Params struct {
@@ -112,9 +113,10 @@ func (p *Params) locationSearch(rawMsg []byte) ([]byte, *string, error) {
 		log.Error(err)
 		return nil, nil, err
 	}
-	log.Debug("etLocationJSON done")
+	log.Debug("getLocationJSON done")
 
 	whoToSent := p.clientReq.ClientID
+	log.Info("%s %d", p.clientReq.ClientID, p.clientReq.ID)
 
 	return placeJSON, &whoToSent, nil
 
@@ -153,6 +155,7 @@ func (p *Params) getLocationFromNominatim() (*Nominatim.DataWithoutDetails, erro
 	if err != nil {
 		return nil, err
 	}
+	place.ID = p.clientReq.ID
 
 	return place, nil
 }

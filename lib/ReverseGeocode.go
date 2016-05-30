@@ -25,6 +25,7 @@ type DataWithoutDetails struct {
 	Lat         string `Lat`
 	Lon         string `Lon`
 	Langaddress string `Langaddress`
+	ID          int    `ID`
 }
 
 func (d DataWithoutDetails) String() string {
