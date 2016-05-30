@@ -6,4 +6,7 @@ worker/test.csv
 worker/logfile*
 worker/test-client
 worker/worker
-
+worker/stomp-client
+worker/go-worker.log*
+worker/client.log*
+worker/config.json
