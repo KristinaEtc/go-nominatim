@@ -1,26 +1,15 @@
 package main
 
 import (
-	"encoding/json"
+	"Nominatim/lib/utils/fileproc"
+	"Nominatim/lib/utils/request"
 	"flag"
 	l4g "github.com/alecthomas/log4go"
 	"github.com/go-stomp/stomp"
 	"os"
-	"strconv"
-	"strings"
-	//	"time"
-	"Nominatim/worker/stomp/fileproc"
 )
 
 var log l4g.Logger = l4g.NewLogger()
-
-type req struct {
-	Lat      float64 `json: Lat`
-	Lon      float64 `json:Lon`
-	Zoom     int     `json:Zoom`
-	ClientID string  `json:ClientID`
-	ID       int     `json:ID`
-}
 
 const (
 	defaultPort = ":61613"
@@ -49,47 +38,6 @@ var options []func(*stomp.Conn) error = []func(*stomp.Conn) error{
 func init() {
 	log.AddFilter("stdout", l4g.INFO, l4g.NewConsoleLogWriter())
 	log.AddFilter("file", l4g.DEBUG, l4g.NewFileLogWriter(LOGFILE, false))
-}
-
-func getLocationJSON(r *req) (string, error) {
-
-	dataJSON, err := json.Marshal(r)
-	if err != nil {
-		return "", err
-	}
-	return string(dataJSON), nil
-}
-
-func makeReq(parameters, clientID string, ID int, log l4g.Logger) (reqInJSON *string, err error) {
-
-	locSlice := strings.Split(parameters, ",")
-	r := req{}
-	r.Lat, err = strconv.ParseFloat(locSlice[0], 32)
-
-	if err != nil {
-		log.Error(err)
-		return nil, err
-	}
-	r.Lon, err = strconv.ParseFloat(locSlice[1], 32)
-	if err != nil {
-		log.Error(err)
-		return nil, err
-	}
-	r.Zoom, err = strconv.Atoi(locSlice[2])
-	if err != nil {
-		log.Error(err)
-		return nil, err
-	}
-	r.ClientID = clientID
-
-	r.ID = ID
-
-	jsonReq, err := getLocationJSON(&r)
-	if err != nil {
-		log.Error(err)
-		return nil, err
-	}
-	return &jsonReq, nil
 }
 
 func sendMessages() {
@@ -130,13 +78,12 @@ func sendMessages() {
 	for fs.Scanner.Scan() {
 		/*if fileNotFinished := fs.Scanner.Scan(); fileNotFinished == true {*/
 		locs := fs.Scanner.Text()
-		log.Info(locs)
 
 		if *debugMode == true {
 			log.Debug("locs: %s", locs)
 		}
 
-		reqInJSON, err := makeReq(locs, clientID, i, log)
+		reqInJSON, err := request.MakeReq(locs, clientID, i, log)
 		if err != nil {
 			log.Error("Could not get coordinates in JSON: wrong format")
 			continue
@@ -152,7 +99,6 @@ func sendMessages() {
 			return
 		}
 		i++
-		//}
 	}
 }
 
@@ -177,7 +123,7 @@ func recvMessages(subscribed chan bool) {
 	}
 	close(subscribed)
 
-	var i = 0
+	var msgCount = 0
 	for {
 		msg := <-sub.C
 		if msg == nil {
@@ -186,7 +132,7 @@ func recvMessages(subscribed chan bool) {
 		}
 
 		message := string(msg.Body)
-		if i%20 == 0 {
+		if msgCount%20 == 0 {
 			log.Info("Got message: %s", message)
 		}
 		i++
