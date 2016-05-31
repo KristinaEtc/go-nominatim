@@ -13,8 +13,9 @@ import (
 	//"sync"
 )
 
-var configFile = "config.json"
+var configFile = "../config.json"
 
+//port :61613 is busy by RabbitMQ
 const defaultPort = ":61614"
 
 var serverAddr = flag.String("server", "localhost:61614", "STOMP server endpoint")
@@ -51,7 +52,7 @@ const (
 	PORT               string = ":4150"
 	topicToSubscribe   string = "main"
 	channelToSubscribe string = "main"
-	LOGFILE            string = "go-worker.log"
+	LOGFILE            string = "worker.log"
 )
 
 type Req struct {

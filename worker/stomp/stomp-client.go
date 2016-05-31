@@ -22,7 +22,7 @@ const (
 )
 
 var (
-	testFile = "test.csv"
+	testFile = "../test.csv"
 	LOGFILE  = "client.log"
 )
 
