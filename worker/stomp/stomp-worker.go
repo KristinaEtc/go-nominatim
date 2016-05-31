@@ -11,13 +11,12 @@ import (
 	"os"
 )
 
-var configFile = "../config.json"
 var log l4g.Logger
-
-const LOGFILE string = "worker.log"
 
 var (
 	serverAddr = flag.String("server", "localhost:61613", "STOMP server endpoint")
+	configFile = flag.String("config", "../config.json", "config file for Nominatim DB")
+	logfile    = flag.String("logfile", "worker.log", "filename for logs")
 	queueName  = flag.String("queue", "/queue/nominatimRequest", "Destination queue")
 	debugMode  = flag.Bool("debug", false, "Debug mode")
 	stop       = make(chan bool)
@@ -51,7 +50,7 @@ type Params struct {
 
 func (p *Params) configurateDB() {
 
-	file, err := os.Open(configFile)
+	file, err := os.Open(*configFile)
 	if err != nil {
 		log.Error("No configurate file")
 	} else {
@@ -223,7 +222,7 @@ func main() {
 	log = l4g.NewLogger()
 
 	log.AddFilter("stdout", l4g.INFO, l4g.NewConsoleLogWriter())
-	log.AddFilter("file", l4g.DEBUG, l4g.NewFileLogWriter(LOGFILE, false))
+	log.AddFilter("file", l4g.DEBUG, l4g.NewFileLogWriter(*logfile, false))
 
 	flag.Parse()
 	flag.Parsed()

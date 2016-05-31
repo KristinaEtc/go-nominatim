@@ -51,20 +51,13 @@ func sendMessages() {
 		return
 	}
 
-	fs, err := fileproc.NewFileScanner(testFile)
-	if err != nil {
-		log.Error(err)
-		os.Exit(1)
-	}
-	defer fs.Close()
-
-	conn2, err := stomp.Dial("tcp", *serverAddr, options...)
+	connSend, err := stomp.Dial("tcp", *serverAddr, options...)
 	if err != nil {
 		log.Error("cannot connect to server", err.Error())
 		return
 	}
 
-	fs, err = fileproc.NewFileScanner(testFile)
+	fs, err := fileproc.NewFileScanner(testFile)
 	if err != nil {
 		log.Error(err)
 		os.Exit(1)
@@ -93,7 +86,7 @@ func sendMessages() {
 		}
 		//time.Sleep(1000 * time.Millisecond)
 
-		err = conn2.Send(*destination, "text/json", []byte(*reqInJSON), nil...)
+		err = connSend.Send(*destination, "text/json", []byte(*reqInJSON), nil...)
 		if err != nil {
 			log.Error("failed to send to server", err)
 			return
@@ -135,7 +128,7 @@ func recvMessages(subscribed chan bool) {
 		if msgCount%20 == 0 {
 			log.Info("Got message: %s", message)
 		}
-		i++
+		msgCount++
 
 	}
 }
