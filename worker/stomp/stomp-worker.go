@@ -12,24 +12,16 @@ import (
 )
 
 var configFile = "../config.json"
-
-var serverAddr = flag.String("server", "localhost:61613", "STOMP server endpoint")
-var queueName = flag.String("queue", "/queue/nominatimRequest", "Destination queue")
-var debugMode = flag.Bool("debug", false, "Debug mode")
-
-var stop = make(chan bool)
-
 var log l4g.Logger
-var log4F = log4goFacade{&log}
 
-type log4goFacade struct {
-	log *l4g.Logger
-}
+const LOGFILE string = "worker.log"
 
-func (l log4goFacade) Output(calldepth int, s string) error {
-	l.log.Debug("(nsq-go) %s", s)
-	return nil
-}
+var (
+	serverAddr = flag.String("server", "localhost:61613", "STOMP server endpoint")
+	queueName  = flag.String("queue", "/queue/nominatimRequest", "Destination queue")
+	debugMode  = flag.Bool("debug", false, "Debug mode")
+	stop       = make(chan bool)
+)
 
 var options []func(*stomp.Conn) error = []func(*stomp.Conn) error{
 	stomp.ConnOpt.Login("guest", "guest"),
@@ -39,8 +31,6 @@ var options []func(*stomp.Conn) error = []func(*stomp.Conn) error{
 type ConfigDB struct {
 	DBname, Host, User, Password string
 }
-
-const LOGFILE string = "worker.log"
 
 type Req struct {
 	Lat      float64 `json: Lat`
@@ -233,7 +223,7 @@ func main() {
 	log = l4g.NewLogger()
 
 	log.AddFilter("stdout", l4g.INFO, l4g.NewConsoleLogWriter())
-	log.AddFilter("file", l4g.DEBUG, l4g.NewFileLogWriter(LOGFILE, true))
+	log.AddFilter("file", l4g.DEBUG, l4g.NewFileLogWriter(LOGFILE, false))
 
 	flag.Parse()
 	flag.Parsed()
