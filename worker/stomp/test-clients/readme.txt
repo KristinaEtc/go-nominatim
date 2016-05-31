@@ -3,7 +3,7 @@ Client2 subscribed to the queue /queue/ONE; when he received message, he resends
 
 	/queue/ONE		/queue/ONE						
 |-------|======>|-------|======>|-------|-------|
-|  cl1	|	|	|server	|	|  cl2	|
+|  cl1	|	|server	|	|	|  cl2	|
 |	|	|	|	|	|	|
 |-------|<======|-------|<======|-------|-------|
 	/queue/TWO		/queue/TWO
