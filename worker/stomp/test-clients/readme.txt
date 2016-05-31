@@ -9,3 +9,6 @@ Client2 subscribed to the queue /queue/ONE; when he received message, he resends
 |	|	|	|	|	|	|
 |-------|<======|-------|<======|-------|-------|
 	/queue/TWO		/queue/TWO
+
+notice: if you want to receive and send messages in one goroutine, be sure that it was maked from 
+different net.Connection interfaces; otherwise there will be problems :(
