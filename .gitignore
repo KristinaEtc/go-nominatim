@@ -2,11 +2,10 @@ cli/config.json
 cli/main
 cli/test.txt
 cli/test.csv
-worker/test.csv
 worker/logfile*
-worker/test-client
-worker/worker
-worker/stomp-client
-worker/go-worker.log*
-worker/client.log*
+worker/nsqd/test-client
+worker/nsqd/worker
+worker/stomp/stomp-client
+worker/stomp/go-worker.log*
+worker/stomp/client.log*
 worker/config.json
