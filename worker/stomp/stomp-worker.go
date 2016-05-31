@@ -6,27 +6,20 @@ import (
 	"encoding/json"
 	"flag"
 	l4g "github.com/alecthomas/log4go"
-	//"github.com/bitly/go-nsq"
 	"github.com/go-stomp/stomp"
 	_ "github.com/lib/pq"
 	"os"
-	//"sync"
 )
 
 var configFile = "../config.json"
 
-//port :61613 is busy by RabbitMQ
-const defaultPort = ":61614"
-
-var serverAddr = flag.String("server", "localhost:61614", "STOMP server endpoint")
-var messageCount = flag.Int("count", 10, "Number of messages to send/receive")
+var serverAddr = flag.String("server", "localhost:61613", "STOMP server endpoint")
 var queueName = flag.String("queue", "/queue/nominatimRequest", "Destination queue")
-var helpFlag = flag.Bool("help", false, "Print help text")
+var debugMode = flag.Bool("debug", false, "Debug mode")
+
 var stop = make(chan bool)
 
 var log l4g.Logger
-
-var numOfReq = 0
 var log4F = log4goFacade{&log}
 
 type log4goFacade struct {
@@ -47,13 +40,7 @@ type ConfigDB struct {
 	DBname, Host, User, Password string
 }
 
-const (
-	HOST               string = "localhost"
-	PORT               string = ":4150"
-	topicToSubscribe   string = "main"
-	channelToSubscribe string = "main"
-	LOGFILE            string = "worker.log"
-)
+const LOGFILE string = "worker.log"
 
 type Req struct {
 	Lat      float64 `json: Lat`
@@ -89,19 +76,27 @@ func (p *Params) configurateDB() {
 		}
 		p.config = configuration
 	}
-	log.Info("db configurate done")
+	if *debugMode == true {
+		log.Debug("db configurate done")
+	}
+
 }
 
 func (p *Params) locationSearch(rawMsg []byte, geocode *Nominatim.ReverseGeocode) ([]byte, *string, error) {
 
-	log.Debug("Got request: %s", rawMsg)
+	if *debugMode == true {
+		log.Debug("Got request: %s", rawMsg)
+	}
 
 	err := p.addCoordinatesToStruct(rawMsg)
 	if err != nil {
 		log.Error(err)
 		return nil, nil, err
 	}
-	log.Debug("addCoordinatesToStruct done")
+	if *debugMode == true {
+		log.Debug("addCoordinatesToStruct done")
+	}
+
 	place, err := p.getLocationFromNominatim(geocode)
 	if err != nil {
 		log.Error(err)
@@ -114,10 +109,15 @@ func (p *Params) locationSearch(rawMsg []byte, geocode *Nominatim.ReverseGeocode
 		log.Error(err)
 		return nil, nil, err
 	}
-	log.Debug("getLocationJSON done")
+
+	if *debugMode == true {
+		log.Debug("getLocationJSON done")
+	}
 
 	whoToSent := p.clientReq.ClientID
-	//log.Info("%s %d", p.clientReq.ClientID, p.clientReq.ID)
+	if *debugMode == true {
+		log.Info("%s %d", p.clientReq.ClientID, p.clientReq.ID)
+	}
 
 	return placeJSON, &whoToSent, nil
 
@@ -178,14 +178,12 @@ func requestLoop(subscribed chan bool, p *Params) {
 	defer reverseGeocode.Close()
 
 	connSubsc, err := stomp.Dial("tcp", *serverAddr, options...)
-
 	if err != nil {
 		println("cannot connect to server", err.Error())
 		return
 	}
 
 	connSend, err := stomp.Dial("tcp", *serverAddr, options...)
-
 	if err != nil {
 		println("cannot connect to server", err.Error())
 		return
@@ -206,7 +204,6 @@ func requestLoop(subscribed chan bool, p *Params) {
 		}
 
 		reqJSON := msg.Body
-		//log.Info(string(reqJSON))
 
 		reqJSON, whoToSent, err := p.locationSearch(msg.Body, reverseGeocode)
 		if err != nil {
@@ -214,7 +211,9 @@ func requestLoop(subscribed chan bool, p *Params) {
 			return
 		}
 
-		//log.Info("whoToSent %s", *whoToSent)
+		if *debugMode == true {
+			log.Debug("whoToSent %s", *whoToSent)
+		}
 
 		err = connSend.Send("/queue/"+*whoToSent, "text/plain",
 			[]byte(reqJSON), nil...)
@@ -222,7 +221,10 @@ func requestLoop(subscribed chan bool, p *Params) {
 			println("failed to send to server", err)
 			return
 		}
-		//log.Info("Sending finished")
+
+		if *debugMode == true {
+			log.Debug("Sending finished")
+		}
 	}
 }
 
@@ -233,13 +235,13 @@ func main() {
 	log.AddFilter("stdout", l4g.INFO, l4g.NewConsoleLogWriter())
 	log.AddFilter("file", l4g.DEBUG, l4g.NewFileLogWriter(LOGFILE, true))
 
+	flag.Parse()
+	flag.Parsed()
+
 	params := Params{}
 	params.configurateDB()
 	subscribed := make(chan bool)
 	go requestLoop(subscribed, &params)
 
 	<-stop
-
-	//params.getParams()
-	//params.locationSearch()
 }
