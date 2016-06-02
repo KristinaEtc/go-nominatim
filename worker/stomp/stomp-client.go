@@ -17,19 +17,18 @@ const (
 )
 
 var (
-	testFile = "../test.csv"
-	LOGFILE  = "client.log"
-)
-
-var (
 	serverAddr  = flag.String("server", "localhost:61613", "STOMP server endpoint")
 	destination = flag.String("topic", "/queue/nominatimRequest", "Destination topic")
 	queueFormat = flag.String("queue", "/queue/", "Queue format")
-	debugMode   = flag.Bool("debug", false, "Debug mode")
-	stop        = make(chan bool)
+	login       = flag.String("login", "client", "Login for authorization")
+	passcode    = flag.String("pwd", "111", "Passcode for authorization")
+	testFile    = flag.String("testfile", "../test.csv", "testfile with coordinates")
+	LOGFILE     = flag.String("log", "client.log", "logfile path/name")
+
+	debugMode = flag.Bool("debug", false, "Debug mode")
+	stop      = make(chan bool)
 )
 
-// these are the default options that work with Rabbi
 var options []func(*stomp.Conn) error = []func(*stomp.Conn) error{
 	stomp.ConnOpt.Login("guest", "guest"),
 	stomp.ConnOpt.Host("/"),
@@ -37,7 +36,7 @@ var options []func(*stomp.Conn) error = []func(*stomp.Conn) error{
 
 func init() {
 	log.AddFilter("stdout", l4g.INFO, l4g.NewConsoleLogWriter())
-	log.AddFilter("file", l4g.DEBUG, l4g.NewFileLogWriter(LOGFILE, false))
+	log.AddFilter("file", l4g.DEBUG, l4g.NewFileLogWriter(*LOGFILE, false))
 }
 
 func sendMessages() {
@@ -47,17 +46,17 @@ func sendMessages() {
 
 	_, err := stomp.Dial("tcp", *serverAddr, options...)
 	if err != nil {
-		log.Error("cannot connect to server", err.Error())
+		log.Error("cannot connect to server %v", err.Error())
 		return
 	}
 
 	connSend, err := stomp.Dial("tcp", *serverAddr, options...)
 	if err != nil {
-		log.Error("cannot connect to server", err.Error())
+		log.Error("cannot connect to server %v", err.Error())
 		return
 	}
 
-	fs, err := fileproc.NewFileScanner(testFile)
+	fs, err := fileproc.NewFileScanner(*testFile)
 	if err != nil {
 		log.Error(err)
 		os.Exit(1)
@@ -81,14 +80,15 @@ func sendMessages() {
 			log.Error("Could not get coordinates in JSON: wrong format")
 			continue
 		}
+
 		if *debugMode == true {
-			log.Debug("reqInJSON: %s", *reqInJSON)
+			log.Info("reqInJSON: %s", *reqInJSON)
 		}
 		//time.Sleep(1000 * time.Millisecond)
 
 		err = connSend.Send(*destination, "text/json", []byte(*reqInJSON), nil...)
 		if err != nil {
-			log.Error("failed to send to server", err)
+			log.Error("Failed to send to server: %v", err)
 			return
 		}
 		i++
@@ -99,9 +99,10 @@ func recvMessages(subscribed chan bool) {
 	defer func() {
 		stop <- true
 	}()
+
 	conn, err := stomp.Dial("tcp", *serverAddr, options...)
 	if err != nil {
-		log.Error("cannot connect to server", err.Error())
+		log.Error("Cannot connect to server: %v", err.Error())
 		return
 	}
 
@@ -111,7 +112,7 @@ func recvMessages(subscribed chan bool) {
 
 	sub, err := conn.Subscribe(*queueFormat+clientID, stomp.AckAuto)
 	if err != nil {
-		log.Error("cannot subscribe to", *queueFormat+clientID, err.Error())
+		log.Error("Cannot subscribe to %s: %v", *queueFormat+clientID, err.Error())
 		return
 	}
 	close(subscribed)
@@ -140,6 +141,11 @@ func main() {
 
 	flag.Parsed()
 	flag.Parse()
+
+	options = []func(*stomp.Conn) error{
+		stomp.ConnOpt.Login(*login, *passcode),
+		stomp.ConnOpt.Host("/"),
+	}
 
 	subscribed := make(chan bool)
 

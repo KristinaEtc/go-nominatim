@@ -14,13 +14,18 @@ import (
 var log l4g.Logger
 
 var (
-	serverAddr = flag.String("server", "localhost:61613", "STOMP server endpoint")
+	serverAddr  = flag.String("server", "localhost:61613", "STOMP server endpoint")
+	queueFormat = flag.String("qFormat", "/queue/", "queue format")
+	queueName   = flag.String("queue", "/queue/nominatimRequest", "Destination queue")
+	debugMode   = flag.Bool("debug", false, "Debug mode")
+
 	configFile = flag.String("config", "../config.json", "config file for Nominatim DB")
 	logfile    = flag.String("logfile", "worker.log", "filename for logs")
-	queueName  = flag.String("queue", "/queue/nominatimRequest", "Destination queue")
-	debugMode  = flag.Bool("debug", false, "Debug mode")
-	stop       = make(chan bool)
+	login      = flag.String("login", "client1", "Login for authorization")
+	passcode   = flag.String("pwd", "111", "Passcode for authorization")
 )
+
+var stop = make(chan bool)
 
 var options []func(*stomp.Conn) error = []func(*stomp.Conn) error{
 	stomp.ConnOpt.Login("guest", "guest"),
@@ -204,7 +209,7 @@ func requestLoop(subscribed chan bool, p *Params) {
 			log.Debug("whoToSent %s", *whoToSent)
 		}
 
-		err = connSend.Send("/queue/"+*whoToSent, "text/plain",
+		err = connSend.Send(*queueFormat+*whoToSent, "text/plain",
 			[]byte(reqJSON), nil...)
 		if err != nil {
 			println("failed to send to server", err)
@@ -226,6 +231,11 @@ func main() {
 
 	flag.Parse()
 	flag.Parsed()
+
+	options = []func(*stomp.Conn) error{
+		stomp.ConnOpt.Login(*login, *passcode),
+		stomp.ConnOpt.Host("/"),
+	}
 
 	params := Params{}
 	params.configurateDB()
