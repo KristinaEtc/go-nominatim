@@ -106,6 +106,11 @@ func (h *Handler) SetColors(colors map[slf.Level]int) {
 
 // Handle outputs a textual representation of the log entry into a text writer (stderr, file etc.).
 func (h *Handler) Handle(e slog.Entry) (err error) {
+
+	if entryLvlPassHandlerLvl(h.Level, e.Level()) == false {
+		return nil
+	}
+
 	defer func() {
 		if r := recover(); r != nil {
 			err = fmt.Errorf("%v", r)
@@ -124,16 +129,8 @@ func (h *Handler) Handle(e slog.Entry) (err error) {
 	}
 	h.Lock()
 	defer h.Unlock()
-	// TODO: COMPARING STRINGS?
-	//lk := e.Level()
-	//fmt.Println("e.Lev: ", e.Level(), " h.Level.String():", h.Level)
-	if lvl1Bigger(h.Level, e.Level()) == true {
-		err = h.template.Execute(h.writer, d)
-		return err
-	} else {
-		return nil
-	}
-
+	err = h.template.Execute(h.writer, d)
+	return err
 }
 
 // Data supplies log data to the template formatter for outputting into the log string. This
@@ -212,32 +209,35 @@ func (sf sortablefields) Less(i, j int) bool {
 	return sf[i].key < sf[j].key
 }
 
-func lvl1Bigger(setLvl, eventLvl slf.Level) bool {
+func entryLvlPassHandlerLvl(hLvl, eLvl slf.Level) bool {
 
-	var setLvlVal, eventLvlVal int
-	if setLvl == slf.LevelInfo {
-		setLvlVal = 1
-	}
-	if setLvl == slf.LevelError {
-		setLvlVal = 3
-	}
-	if setLvl == slf.LevelDebug {
-		setLvlVal = 0
-	}
+	hLvlValue := getLevelCode(hLvl)
+	eLvlValue := getLevelCode(eLvl)
 
-	if eventLvl == slf.LevelInfo {
-		eventLvlVal = 1
-	}
-	if eventLvl == slf.LevelError {
-		eventLvlVal = 3
-	}
-	if eventLvl == slf.LevelDebug {
-		eventLvlVal = 0
-	}
-
-	if setLvlVal <= eventLvlVal {
+	if eLvlValue >= hLvlValue {
 		return true
+	} else {
+		return false
 	}
-	return false
+}
 
+func getLevelCode(l slf.Level) int {
+
+	switch l {
+	case slf.LevelDebug:
+		return 0
+	case slf.LevelInfo:
+		return 1
+	case slf.LevelWarn:
+		return 2
+	case slf.LevelError:
+		return 3
+	case slf.LevelPanic:
+		return 4
+	case slf.LevelFatal:
+		return 5
+	default:
+		fmt.Errorf("getLevelCode: unknown level %d", int(l))
+		return 0
+	}
 }
