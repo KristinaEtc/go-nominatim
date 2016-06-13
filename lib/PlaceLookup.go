@@ -4,10 +4,11 @@ import (
 	"database/sql"
 	"fmt"
 	_ "github.com/lib/pq"
-	"log"
-	//"strconv"
-	//"encoding/json"
+	"github.com/ventu-io/slf"
 )
+
+var pwdCurr string = "Nominatim/lib/PlaceLookup.go"
+var log slf.StructuredLogger
 
 type PlaceLookup struct {
 	maxRank int
@@ -20,6 +21,7 @@ type PlaceLookup struct {
 func NewPlaceLookup(db *sql.DB) PlaceLookup {
 	p := PlaceLookup{db: db}
 	p.addressDetails = false
+	log = slf.WithContext(pwdCurr)
 	return p
 }
 
@@ -108,7 +110,7 @@ func (p *PlaceLookup) Lookup() (placeData map[string]string) {
 	`
 	rows, err := p.db.Query(sqlReq, p.placeID)
 	if err != nil {
-		log.Println("error", err)
+		log.Errorf("Error: %v", err.Error())
 		return
 	}
 	defer rows.Close()

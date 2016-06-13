@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	//"fmt"
 	_ "github.com/lib/pq"
-	"log"
 	//"strconv"
 	"errors"
 )
@@ -72,7 +71,7 @@ func (r *ReverseGeocode) SetLocation(fLat, fLon float64) {
 }
 
 func (r *ReverseGeocode) SetLanguagePreference() {
-	log.Print("set language pref")
+	log.Debug("set language pref")
 }
 
 func (r *ReverseGeocode) SetRank(iRank int) {
@@ -192,7 +191,7 @@ func (r *ReverseGeocode) Lookup() (*DataWithoutDetails, error) {
 			//return nil, err
 			continue
 		case err != nil:
-			log.Fatal(err, "QueryRow")
+			log.Panicf("QueryRow", err.Error())
 		default:
 			//log.Println("QueryRow result:", iPlaceID, iParentPlace, iRank)
 		}
@@ -204,7 +203,7 @@ func (r *ReverseGeocode) Lookup() (*DataWithoutDetails, error) {
 	if iPlaceID.Valid && iMaxRank < 28 {
 		if iRank > 28 && iParentPlace.Valid {
 			iPlaceID = iParentPlace
-			log.Println("use parent place:", iParentPlace)
+			log.Debugf("use parent place: %d", iParentPlace)
 		}
 
 		sSQL = `select address_place_id 
@@ -217,7 +216,7 @@ func (r *ReverseGeocode) Lookup() (*DataWithoutDetails, error) {
 		case err == sql.ErrNoRows:
 			break
 		case err != nil:
-			log.Fatal("QueryRow", err)
+			log.Fatalf("QueryRow: %v", err.Error())
 		default:
 			//log.Println("address_place_id:", iNewPlaceID)
 			if iNewPlaceID.Valid {
