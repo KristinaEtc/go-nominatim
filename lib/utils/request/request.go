@@ -2,10 +2,11 @@ package request
 
 import (
 	"encoding/json"
-	//l4g "github.com/alecthomas/log4go"
 	"strconv"
 	"strings"
 )
+
+const pwdCurr string = "Nominatim/lib/utils/request"
 
 type Req struct {
 	Lat      float64 `json:Lat`
@@ -32,17 +33,14 @@ func MakeReq(parameters, clientID string, ID int) (reqInJSON *string, err error)
 	r.Lat, err = strconv.ParseFloat(locSlice[0], 32)
 
 	if err != nil {
-		//	log.Error(err)
 		return nil, err
 	}
 	r.Lon, err = strconv.ParseFloat(locSlice[1], 32)
 	if err != nil {
-		//log.Error(err)
 		return nil, err
 	}
 	r.Zoom, err = strconv.Atoi(locSlice[2])
 	if err != nil {
-		//log.Error(err)
 		return nil, err
 	}
 	r.ClientID = clientID
@@ -51,7 +49,6 @@ func MakeReq(parameters, clientID string, ID int) (reqInJSON *string, err error)
 
 	jsonReq, err := r.getLocationJSON()
 	if err != nil {
-		//	log.Error(err)
 		return nil, err
 	}
 	return &jsonReq, nil
