@@ -102,9 +102,7 @@ func init() {
 		log.Panicf("Could not open/create logfile", LogDir+errorFilename)
 	}
 
-	if *debugMode == true {
-		bhDebugConsole.SetWriter(os.Stdout)
-	}
+	bhDebugConsole.SetWriter(os.Stdout)
 
 	bhDebug.SetWriter(logfileDebug)
 	bhInfo.SetWriter(logfileInfo)
@@ -139,7 +137,7 @@ func (p *Params) configurateDB() {
 
 		err := decoder.Decode(&configuration)
 		if err != nil {
-			log.Errorf("error: ", err)
+			log.Errorf("error: %v", err.Error())
 		}
 		p.config = configuration
 	}
