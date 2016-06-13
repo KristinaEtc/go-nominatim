@@ -1,12 +1,10 @@
 package main
 
 import (
+	"Nominatim/lib/utils/basic"
 	"Nominatim/lib/utils/fileproc"
 	"Nominatim/lib/utils/request"
 	"flag"
-	"fmt"
-	//l4g "github.com/alecthomas/log4go"
-	"Nominatim/lib/utils/basic"
 	"github.com/go-stomp/stomp"
 	"github.com/ventu-io/slf"
 	"github.com/ventu-io/slog"
