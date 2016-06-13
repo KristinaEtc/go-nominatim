@@ -2,16 +2,17 @@ package main
 
 import (
 	"Nominatim/lib"
+	"Nominatim/lib/utils/basic"
 	"database/sql"
 	"encoding/json"
 	"flag"
-	l4g "github.com/alecthomas/log4go"
 	"github.com/go-stomp/stomp"
 	_ "github.com/lib/pq"
+	"github.com/ventu-io/slf"
+	"github.com/ventu-io/slog"
 	"os"
+	"path/filepath"
 )
-
-var log l4g.Logger
 
 var (
 	serverAddr  = flag.String("server", "localhost:61613", "STOMP server endpoint")
@@ -53,6 +54,78 @@ type Params struct {
 	db             *sql.DB
 }
 
+const LogDir = "logs/"
+const (
+	errorFilename = "error.log"
+	infoFilename  = "info.log"
+	debugFilename = "debug.log"
+)
+
+var (
+	bhDebug, bhInfo, bhError, bhDebugConsole *basic.Handler
+	logfileInfo, logfileDebug, logfileError  *os.File
+	lf                                       slog.LogFactory
+
+	log slf.StructuredLogger
+)
+
+// Init loggers
+func init() {
+
+	bhDebug = basic.New(slf.LevelDebug)
+	bhDebugConsole = basic.New(slf.LevelDebug)
+	bhInfo = basic.New()
+	bhError = basic.New(slf.LevelError)
+
+	// optionally define the format (this here is the default one)
+	bhInfo.SetTemplate("{{.Time}} [\033[{{.Color}}m{{.Level}}\033[0m] {{.Context}}{{if .Caller}} ({{.Caller}}){{end}}: {{.Message}}{{if .Error}} (\033[31merror: {{.Error}}\033[0m){{end}} {{.Fields}}")
+
+	// TODO: create directory in /var/log, if in linux:
+	// if runtime.GOOS == "linux" {
+	os.Mkdir("."+string(filepath.Separator)+LogDir, 0766)
+
+	// interestings with err: if not initialize err before,
+	// how can i use global logfileInfo?
+	var err error
+	logfileInfo, err = os.OpenFile(LogDir+infoFilename, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0666)
+	if err != nil {
+		log.Panicf("Could not open/create %s logfile", LogDir+infoFilename)
+	}
+
+	logfileDebug, err = os.OpenFile(LogDir+debugFilename, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0666)
+	if err != nil {
+		log.Panicf("Could not open/create logfile", LogDir+debugFilename)
+	}
+
+	logfileError, err = os.OpenFile(LogDir+errorFilename, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0666)
+	if err != nil {
+		log.Panicf("Could not open/create logfile", LogDir+errorFilename)
+	}
+
+	if *debugMode == true {
+		bhDebugConsole.SetWriter(os.Stdout)
+	}
+
+	bhDebug.SetWriter(logfileDebug)
+	bhInfo.SetWriter(logfileInfo)
+	bhError.SetWriter(logfileError)
+
+	lf = slog.New()
+	lf.SetLevel(slf.LevelDebug) //lf.SetLevel(slf.LevelDebug, "app.package1", "app.package2")
+	lf.SetEntryHandlers(bhInfo, bhError, bhDebug)
+
+	if *debugMode == true {
+		lf.SetEntryHandlers(bhInfo, bhError, bhDebug, bhDebugConsole)
+	} else {
+		lf.SetEntryHandlers(bhInfo, bhError, bhDebug)
+	}
+
+	// make this into the one used by all the libraries
+	slf.Set(lf)
+
+	log = slf.WithContext("main-worker.go")
+}
+
 func (p *Params) configurateDB() {
 
 	file, err := os.Open(*configFile)
@@ -66,52 +139,44 @@ func (p *Params) configurateDB() {
 
 		err := decoder.Decode(&configuration)
 		if err != nil {
-			log.Error("error: ", err)
+			log.Errorf("error: ", err)
 		}
 		p.config = configuration
 	}
-	if *debugMode == true {
-		log.Debug("db configurate done")
-	}
+
+	log.Debug("db configurate done")
 
 }
 
 func (p *Params) locationSearch(rawMsg []byte, geocode *Nominatim.ReverseGeocode) ([]byte, *string, error) {
 
-	if *debugMode == true {
-		log.Debug("Got request: %s", rawMsg)
-	}
+	log.Debugf("Got request: %s", rawMsg)
 
 	err := p.addCoordinatesToStruct(rawMsg)
 	if err != nil {
-		log.Error(err)
+		log.Error(err.Error())
 		return nil, nil, err
 	}
-	if *debugMode == true {
-		log.Debug("addCoordinatesToStruct done")
-	}
+	log.Debug("addCoordinatesToStruct done")
 
 	place, err := p.getLocationFromNominatim(geocode)
 	if err != nil {
-		log.Error(err)
+		log.Error(err.Error())
 		return nil, nil, err
 	}
 
 	log.Debug("getLocationFromNominatim done")
 	placeJSON, err := getLocationJSON(*place)
 	if err != nil {
-		log.Error(err)
+		log.Error(err.Error())
 		return nil, nil, err
 	}
 
-	if *debugMode == true {
-		log.Debug("getLocationJSON done")
-	}
+	log.Debug("getLocationJSON done")
 
 	whoToSent := p.clientReq.ClientID
-	if *debugMode == true {
-		log.Info("%s %d", p.clientReq.ClientID, p.clientReq.ID)
-	}
+
+	log.Infof("%s %d", p.clientReq.ClientID, p.clientReq.ID)
 
 	return placeJSON, &whoToSent, nil
 
@@ -147,7 +212,7 @@ func getLocationJSON(data Nominatim.DataWithoutDetails) ([]byte, error) {
 
 	dataJSON, err := json.Marshal(data)
 	if err != nil {
-		log.Error(err)
+		log.Error(err.Error())
 		return nil, err
 	}
 
@@ -166,26 +231,25 @@ func requestLoop(subscribed chan bool, p *Params) {
 
 	reverseGeocode, err := Nominatim.NewReverseGeocode(sqlOpenStr)
 	if err != nil {
-		log.Critical(err)
-		os.Exit(1)
+		log.Panic(err.Error())
 	}
 	defer reverseGeocode.Close()
 
 	connSubsc, err := stomp.Dial("tcp", *serverAddr, options...)
 	if err != nil {
-		println("cannot connect to server", err.Error())
+		log.Errorf("cannot connect to server: %s", err.Error())
 		return
 	}
 
 	connSend, err := stomp.Dial("tcp", *serverAddr, options...)
 	if err != nil {
-		println("cannot connect to server", err.Error())
+		log.Errorf("cannot connect to server: %s", err.Error())
 		return
 	}
 
 	sub, err := connSubsc.Subscribe(*queueName, stomp.AckAuto)
 	if err != nil {
-		println("cannot subscribe to", *queueName, err.Error())
+		log.Errorf("cannot subscribe to %s: %s", *queueName, err.Error())
 		return
 	}
 	close(subscribed)
@@ -205,29 +269,24 @@ func requestLoop(subscribed chan bool, p *Params) {
 			return
 		}
 
-		if *debugMode == true {
-			log.Debug("whoToSent %s", *whoToSent)
-		}
+		log.Debugf("whoToSent %s", *whoToSent)
 
 		err = connSend.Send(*queueFormat+*whoToSent, "text/plain",
 			[]byte(reqJSON), nil...)
 		if err != nil {
-			println("failed to send to server", err)
+			log.Errorf("Failed to send to server %s", err)
 			return
 		}
 
-		if *debugMode == true {
-			log.Debug("Sending finished")
-		}
+		log.Debug("Sending finished")
 	}
 }
 
 func main() {
 
-	log = l4g.NewLogger()
-
-	log.AddFilter("stdout", l4g.INFO, l4g.NewConsoleLogWriter())
-	log.AddFilter("file", l4g.DEBUG, l4g.NewFileLogWriter(*logfile, false))
+	defer logfileInfo.Close()
+	defer logfileDebug.Close()
+	defer logfileError.Close()
 
 	flag.Parse()
 	flag.Parsed()
