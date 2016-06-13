@@ -10,3 +10,4 @@ worker/stomp/go-worker.log*
 worker/stomp/client.log*
 worker/config.json
 worker/stomp/worker.log*
+worker/stomp/logs
