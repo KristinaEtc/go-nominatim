@@ -30,7 +30,7 @@ var (
 	testFile    = flag.String("testfile", "../test.csv", "testfile with coordinates")
 
 	//true doesn't works 0_o
-	debugMode = flag.Bool("debug", false, "Debug mode")
+	debugMode = flag.Bool("debug", true, "Debug mode")
 	stop      = make(chan bool)
 )
 
@@ -40,6 +40,12 @@ var options []func(*stomp.Conn) error = []func(*stomp.Conn) error{
 }
 
 const LogDir = "logs/"
+
+const (
+	errorFilename = "error.log"
+	infoFilename  = "info.log"
+	debugFilename = "debug.log"
+)
 
 var (
 	bhDebug, bhInfo, bhError, bhDebugConsole *basic.Handler
@@ -67,25 +73,22 @@ func init() {
 	// interestings with err: if not initialize err before,
 	// how can i use global logfileInfo?
 	var err error
-	logfileInfo, err = os.OpenFile(LogDir+"info.log", os.O_CREATE|os.O_RDWR|os.O_APPEND, 0666)
+	logfileInfo, err = os.OpenFile(LogDir+infoFilename, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0666)
 	if err != nil {
-		fmt.Println("testr")
-		os.Exit(1)
+		log.Panicf("Could not open/create %s logfile", LogDir+infoFilename)
 	}
 
-	logfileDebug, err = os.OpenFile(LogDir+"debug.log", os.O_CREATE|os.O_RDWR|os.O_APPEND, 0666)
+	logfileDebug, err = os.OpenFile(LogDir+debugFilename, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0666)
 	if err != nil {
-		fmt.Println("testr")
-		os.Exit(1)
+		log.Panicf("Could not open/create logfile", LogDir+debugFilename)
 	}
 
-	logfileError, err = os.OpenFile(LogDir+"error.log", os.O_CREATE|os.O_RDWR|os.O_APPEND, 0666)
+	logfileError, err = os.OpenFile(LogDir+errorFilename, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0666)
 	if err != nil {
-		os.Exit(1)
+		log.Panicf("Could not open/create logfile", LogDir+errorFilename)
 	}
 
 	if *debugMode == true {
-		fmt.Println("yess")
 		bhDebugConsole.SetWriter(os.Stdout)
 	}
 
@@ -94,11 +97,10 @@ func init() {
 	bhError.SetWriter(logfileError)
 
 	lf = slog.New()
-	lf.SetLevel(slf.LevelDebug)
-	//lf.SetLevel(slf.LevelDebug, "app.package1", "app.package2")
+	lf.SetLevel(slf.LevelDebug) //lf.SetLevel(slf.LevelDebug, "app.package1", "app.package2")
 	lf.SetEntryHandlers(bhInfo, bhError, bhDebug)
+
 	if *debugMode == true {
-		fmt.Println("yess")
 		lf.SetEntryHandlers(bhInfo, bhError, bhDebug, bhDebugConsole)
 	} else {
 		lf.SetEntryHandlers(bhInfo, bhError, bhDebug)
@@ -107,7 +109,7 @@ func init() {
 	// make this into the one used by all the libraries
 	slf.Set(lf)
 
-	log = slf.WithContext("main.go")
+	log = slf.WithContext("main-client.go")
 }
 
 func sendMessages() {
@@ -117,9 +119,7 @@ func sendMessages() {
 
 	_, err := stomp.Dial("tcp", *serverAddr, options...)
 	if err != nil {
-		//		log.Error("cannot connect to server %v", err.Error())
-		//!!!
-		log.Error("cannot connect to server ")
+		log.Errorf("cannot connect to server %v", err.Error())
 		return
 	}
 
@@ -131,22 +131,18 @@ func sendMessages() {
 
 	fs, err := fileproc.NewFileScanner(*testFile)
 	if err != nil {
-		//	log.Panic(err)
-		os.Exit(1)
+		log.Panic(err.Error())
 	}
 	defer fs.Close()
 
 	fs.Scanner = fs.GetScanner()
 
 	i := 0
-
 	for fs.Scanner.Scan() {
 		/*if fileNotFinished := fs.Scanner.Scan(); fileNotFinished == true {*/
 		locs := fs.Scanner.Text()
 
-		if *debugMode == true {
-			log.Debugf("locs: %s", locs)
-		}
+		log.Debugf("locs: %s", locs)
 
 		reqInJSON, err := request.MakeReq(locs, clientID, i)
 		//reqInJSON, err := request.MakeReq(locs, clientID, i, log)
@@ -155,10 +151,7 @@ func sendMessages() {
 			continue
 		}
 
-		if *debugMode == true {
-			log.Infof("reqInJSON: %s", *reqInJSON)
-		}
-		//time.Sleep(1000 * time.Millisecond)
+		log.Debugf("reqInJSON: %s", *reqInJSON)
 
 		err = connSend.Send(*destination, "text/json", []byte(*reqInJSON), nil...)
 		if err != nil {
@@ -180,9 +173,7 @@ func recvMessages(subscribed chan bool) {
 		return
 	}
 
-	if *debugMode == true {
-		log.Debugf("Subscribing to %s", *queueFormat+clientID)
-	}
+	log.Debugf("Subscribing to %s", *queueFormat+clientID)
 
 	sub, err := conn.Subscribe(*queueFormat+clientID, stomp.AckAuto)
 	if err != nil {
@@ -204,7 +195,6 @@ func recvMessages(subscribed chan bool) {
 			log.Infof("Got message: %s", message)
 		}
 		msgCount++
-
 	}
 }
 
