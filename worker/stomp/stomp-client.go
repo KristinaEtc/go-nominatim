@@ -20,16 +20,17 @@ const (
 )
 
 var (
-	serverAddr  = flag.String("server", "localhost:61613", "STOMP server endpoint")
+	serverAddr  = flag.String("server", "localhost:61614", "STOMP server endpoint")
 	destination = flag.String("topic", "/queue/nominatimRequest", "Destination topic")
 	queueFormat = flag.String("queue", "/queue/", "Queue format")
 	login       = flag.String("login", "client1", "Login for authorization")
 	passcode    = flag.String("pwd", "111", "Passcode for authorization")
 	testFile    = flag.String("testfile", "../test.csv", "testfile with coordinates")
 
-	//true doesn't works 0_o
-	debugMode = flag.Bool("debug", true, "Debug mode")
-	stop      = make(chan bool)
+	logLevel    = flag.String("loglevel", "INFO", "IFOO, DEBUG, ERROR, WARN, PANIC, FATAL")
+	consoleMode = flag.Bool("console", true, "Console output")
+
+	stop = make(chan bool)
 )
 
 var options []func(*stomp.Conn) error = []func(*stomp.Conn) error{
@@ -37,7 +38,7 @@ var options []func(*stomp.Conn) error = []func(*stomp.Conn) error{
 	stomp.ConnOpt.Host("/"),
 }
 
-const LogDir = "logs/"
+const LogDir = "/home/k/work/go/src/Nominatim/worker/stomp/logs/"
 
 const (
 	errorFilename = "error.log"
@@ -46,18 +47,22 @@ const (
 )
 
 var (
-	bhDebug, bhInfo, bhError, bhDebugConsole *basic.Handler
-	logfileInfo, logfileDebug, logfileError  *os.File
-	lf                                       slog.LogFactory
+	bhDebug, bhInfo, bhError, bhConsole     *basic.Handler
+	logfileInfo, logfileDebug, logfileError *os.File
+	lf                                      slog.LogFactory
 
 	log slf.StructuredLogger
 )
 
-// Init loggers
-func init() {
+func initLoggers() {
+
+	if *consoleMode == true {
+		lvl := getLogLevel(*logLevel)
+		bhConsole = basic.New(lvl)
+		bhConsole.SetWriter(os.Stdout)
+	}
 
 	bhDebug = basic.New(slf.LevelDebug)
-	bhDebugConsole = basic.New(slf.LevelDebug)
 	bhInfo = basic.New()
 	bhError = basic.New(slf.LevelError)
 
@@ -86,20 +91,15 @@ func init() {
 		log.Panicf("Could not open/create logfile", LogDir+errorFilename)
 	}
 
-	if *debugMode == true {
-		bhDebugConsole.SetWriter(os.Stdout)
-	}
-
 	bhDebug.SetWriter(logfileDebug)
 	bhInfo.SetWriter(logfileInfo)
 	bhError.SetWriter(logfileError)
 
 	lf = slog.New()
 	lf.SetLevel(slf.LevelDebug) //lf.SetLevel(slf.LevelDebug, "app.package1", "app.package2")
-	lf.SetEntryHandlers(bhInfo, bhError, bhDebug)
 
-	if *debugMode == true {
-		lf.SetEntryHandlers(bhInfo, bhError, bhDebug, bhDebugConsole)
+	if *consoleMode == true {
+		lf.SetEntryHandlers(bhInfo, bhError, bhDebug, bhConsole)
 	} else {
 		lf.SetEntryHandlers(bhInfo, bhError, bhDebug)
 	}
@@ -198,14 +198,13 @@ func recvMessages(subscribed chan bool) {
 
 func main() {
 
+	flag.Parsed()
+	flag.Parse()
+
+	initLoggers()
 	defer logfileInfo.Close()
 	defer logfileDebug.Close()
 	defer logfileError.Close()
-
-	//defer log.Close()
-
-	flag.Parsed()
-	flag.Parse()
 
 	options = []func(*stomp.Conn) error{
 		stomp.ConnOpt.Login(*login, *passcode),
@@ -213,9 +212,7 @@ func main() {
 	}
 
 	subscribed := make(chan bool)
-	if *debugMode == true {
-		log.Debug("main")
-	}
+	log.Info("starting working...")
 
 	go recvMessages(subscribed)
 	// wait until we know the receiver has subscribed
@@ -225,4 +222,28 @@ func main() {
 
 	<-stop
 	<-stop
+}
+
+func getLogLevel(lvl string) slf.Level {
+
+	switch lvl {
+	case slf.LevelDebug.String():
+		return slf.LevelDebug
+
+	case slf.LevelInfo.String():
+		return slf.LevelInfo
+
+	case slf.LevelWarn.String():
+		return slf.LevelWarn
+
+	case slf.LevelError.String():
+		return slf.LevelError
+
+	case slf.LevelFatal.String():
+		return slf.LevelFatal
+	case slf.LevelPanic.String():
+		return slf.LevelPanic
+	default:
+		return slf.LevelDebug
+	}
 }
