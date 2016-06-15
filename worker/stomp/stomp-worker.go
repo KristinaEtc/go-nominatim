@@ -11,7 +11,6 @@ import (
 	"github.com/ventu-io/slf"
 	"github.com/ventu-io/slog"
 	"os"
-	"path/filepath"
 )
 
 var (
@@ -19,8 +18,8 @@ var (
 	queueFormat = flag.String("qFormat", "/queue/", "queue format")
 	queueName   = flag.String("queue", "/queue/nominatimRequest", "Destination queue")
 
-	configFile = flag.String("config", "/home/k/work/go/src/Nominatim/worker/config.json", "config file for Nominatim DB")
-	logfile    = flag.String("logfile", "worker.log", "filename for logs")
+	configFile = flag.String("config", "/opt/go-stomp/go-stomp-nominatim/config.json", "config file for Nominatim DB")
+	logpath    = flag.String("logpath", "/opt/go-stomp/go-stomp-worker/logs/", "logpath to logs")
 	login      = flag.String("login", "client1", "Login for authorization")
 	passcode   = flag.String("pwd", "111", "Passcode for authorization")
 
@@ -56,7 +55,6 @@ type Params struct {
 	db             *sql.DB
 }
 
-const LogDir = "/home/k/work/go/src/Nominatim/worker/stomp/logs/"
 const (
 	errorFilename = "error.log"
 	infoFilename  = "info.log"
@@ -88,24 +86,24 @@ func initLoggers() {
 
 	// TODO: create directory in /var/log, if in linux:
 	// if runtime.GOOS == "linux" {
-	os.Mkdir("."+string(filepath.Separator)+LogDir, 0766)
+	os.Mkdir(*logpath, 0755)
 
 	// interestings with err: if not initialize err before,
 	// how can i use global logfileInfo?
 	var err error
-	logfileInfo, err = os.OpenFile(LogDir+infoFilename, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0666)
+	logfileInfo, err = os.OpenFile(*logpath+infoFilename, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0755)
 	if err != nil {
-		log.Panicf("Could not open/create %s logfile", LogDir+infoFilename)
+		log.Panicf("Could not open/create %s logfile", *logpath+infoFilename)
 	}
 
-	logfileDebug, err = os.OpenFile(LogDir+debugFilename, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0666)
+	logfileDebug, err = os.OpenFile(*logpath+debugFilename, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0755)
 	if err != nil {
-		log.Panicf("Could not open/create logfile", LogDir+debugFilename)
+		log.Panicf("Could not open/create logfile", *logpath+debugFilename)
 	}
 
-	logfileError, err = os.OpenFile(LogDir+errorFilename, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0666)
+	logfileError, err = os.OpenFile(*logpath+errorFilename, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0755)
 	if err != nil {
-		log.Panicf("Could not open/create logfile", LogDir+errorFilename)
+		log.Panicf("Could not open/create logfile", *logpath+errorFilename)
 	}
 
 	bhDebug.SetWriter(logfileDebug)
@@ -124,7 +122,7 @@ func initLoggers() {
 	// make this into the one used by all the libraries
 	slf.Set(lf)
 
-	log = slf.WithContext("main-worker.go")
+	log = slf.WithContext("stomp-worker.go")
 }
 
 func (p *Params) configurateDB() {
