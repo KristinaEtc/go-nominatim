@@ -2,14 +2,13 @@ package main
 
 import (
 	"Nominatim/lib"
-	"Nominatim/lib/utils/basic"
 	"database/sql"
 	"encoding/json"
 	"flag"
+	"github.com/KristinaEtc/slflog"
 	"github.com/go-stomp/stomp"
 	_ "github.com/lib/pq"
 	"github.com/ventu-io/slf"
-	"github.com/ventu-io/slog"
 	"os"
 )
 
@@ -19,12 +18,11 @@ var (
 	queueName   = flag.String("queue", "/queue/nominatimRequest", "Destination queue")
 
 	configFile = flag.String("config", "/opt/go-stomp/go-stomp-nominatim/config.json", "config file for Nominatim DB")
-	logpath    = flag.String("logpath", "/opt/go-stomp/go-stomp-worker/logs/", "logpath to logs")
 	login      = flag.String("login", "client1", "Login for authorization")
 	passcode   = flag.String("pwd", "111", "Passcode for authorization")
 
-	logLevel    = flag.String("loglevel", "INFO", "IFOO, DEBUG, ERROR, WARN, PANIC, FATAL")
-	consoleMode = flag.Bool("console", true, "Console output")
+	logPath  = flag.String("logpath", "logs", "path to logfiles")
+	logLevel = flag.String("loglevel", "WARN", "IFOO, DEBUG, ERROR, WARN, PANIC, FATAL - loglevel for stderr")
 )
 
 var stop = make(chan bool)
@@ -61,91 +59,7 @@ const (
 	debugFilename = "debug.log"
 )
 
-var (
-	bhDebug, bhInfo, bhError, bhConsole     *basic.Handler
-	logfileInfo, logfileDebug, logfileError *os.File
-	lf                                      slog.LogFactory
-
-	log slf.StructuredLogger
-)
-
-func initLoggers() {
-
-	if *consoleMode == true {
-		lvl := getLogLevel(*logLevel)
-		bhConsole = basic.New(lvl)
-		bhConsole.SetWriter(os.Stdout)
-	}
-
-	bhDebug = basic.New(slf.LevelDebug)
-	bhInfo = basic.New()
-	bhError = basic.New(slf.LevelError)
-
-	// optionally define the format (this here is the default one)
-	bhInfo.SetTemplate("{{.Time}} [\033[{{.Color}}m{{.Level}}\033[0m] {{.Context}}{{if .Caller}} ({{.Caller}}){{end}}: {{.Message}}{{if .Error}} (\033[31merror: {{.Error}}\033[0m){{end}} {{.Fields}}")
-
-	// TODO: create directory in /var/log, if in linux:
-	// if runtime.GOOS == "linux" {
-	os.Mkdir(*logpath, 0755)
-
-	// interestings with err: if not initialize err before,
-	// how can i use global logfileInfo?
-	var err error
-	logfileInfo, err = os.OpenFile(*logpath+infoFilename, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0755)
-	if err != nil {
-		log.Panicf("Could not open/create %s logfile", *logpath+infoFilename)
-	}
-
-	logfileDebug, err = os.OpenFile(*logpath+debugFilename, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0755)
-	if err != nil {
-		log.Panicf("Could not open/create logfile", *logpath+debugFilename)
-	}
-
-	logfileError, err = os.OpenFile(*logpath+errorFilename, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0755)
-	if err != nil {
-		log.Panicf("Could not open/create logfile", *logpath+errorFilename)
-	}
-
-	bhDebug.SetWriter(logfileDebug)
-	bhInfo.SetWriter(logfileInfo)
-	bhError.SetWriter(logfileError)
-
-	lf = slog.New()
-	lf.SetLevel(slf.LevelDebug) //lf.SetLevel(slf.LevelDebug, "app.package1", "app.package2")
-
-	if *consoleMode == true {
-		lf.SetEntryHandlers(bhInfo, bhError, bhDebug, bhConsole)
-	} else {
-		lf.SetEntryHandlers(bhInfo, bhError, bhDebug)
-	}
-
-	// make this into the one used by all the libraries
-	slf.Set(lf)
-
-	log = slf.WithContext("stomp-worker.go")
-}
-
-func (p *Params) configurateDB() {
-
-	file, err := os.Open(*configFile)
-	if err != nil {
-		log.Error("No configurate file")
-	} else {
-
-		defer file.Close()
-		decoder := json.NewDecoder(file)
-		configuration := ConfigDB{}
-
-		err := decoder.Decode(&configuration)
-		if err != nil {
-			log.Errorf("error: %v", err.Error())
-		}
-		p.config = configuration
-	}
-
-	log.Debug("db configurate done")
-
-}
+var log slf.StructuredLogger
 
 func (p *Params) locationSearch(rawMsg []byte, geocode *Nominatim.ReverseGeocode) ([]byte, *string, error) {
 
@@ -281,16 +195,33 @@ func requestLoop(subscribed chan bool, p *Params) {
 	}
 }
 
+func (p *Params) configurateDB() {
+
+	file, err := os.Open(*configFile)
+	if err != nil {
+		log.Error("No configurate file")
+	} else {
+
+		defer file.Close()
+		decoder := json.NewDecoder(file)
+		configuration := ConfigDB{}
+
+		err := decoder.Decode(&configuration)
+		if err != nil {
+			log.Errorf("error: %v", err.Error())
+		}
+		p.config = configuration
+	}
+
+	log.Debug("db configurate done")
+
+}
+
 func main() {
 
-	flag.Parsed()
 	flag.Parse()
-
-	initLoggers()
-
-	defer logfileInfo.Close()
-	defer logfileDebug.Close()
-	defer logfileError.Close()
+	slflog.InitLoggers(*logPath, *logLevel)
+	log = slf.WithContext("go-stompd-worker.go")
 
 	options = []func(*stomp.Conn) error{
 		stomp.ConnOpt.Login(*login, *passcode),
@@ -304,28 +235,4 @@ func main() {
 	go requestLoop(subscribed, &params)
 
 	<-stop
-}
-
-func getLogLevel(lvl string) slf.Level {
-
-	switch lvl {
-	case slf.LevelDebug.String():
-		return slf.LevelDebug
-
-	case slf.LevelInfo.String():
-		return slf.LevelInfo
-
-	case slf.LevelWarn.String():
-		return slf.LevelWarn
-
-	case slf.LevelError.String():
-		return slf.LevelError
-
-	case slf.LevelFatal.String():
-		return slf.LevelFatal
-	case slf.LevelPanic.String():
-		return slf.LevelPanic
-	default:
-		return slf.LevelDebug
-	}
 }
