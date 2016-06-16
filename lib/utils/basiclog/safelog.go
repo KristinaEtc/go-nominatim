@@ -1,7 +1,7 @@
 package basiclog
 
 import (
-	"fmt"
+	"os"
 )
 
 // TODO: create directory in /var/log, if in linux:
@@ -11,5 +11,5 @@ import (
 //syslog & stderr for linux
 
 func SafeLog(msg string) {
-	fmt.Println(msg)
+	os.Stderr.WriteString(msg)
 }

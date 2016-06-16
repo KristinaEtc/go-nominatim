@@ -76,6 +76,25 @@ func New(level ...slf.Level) *Handler {
 	return res
 }
 
+func ConfigFileOutput(logHandlers *[]slog.EntryHandler, lvl slf.Level, fileName string) {
+
+	bHandler := New(lvl)
+	logfd, err := os.OpenFile(fileName, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0644)
+	if err != nil {
+		SafeLog("[basiclog.go] Error: could not open/create logfile: " + fileName)
+	}
+
+	bHandler.SetWriter(logfd)
+	*logHandlers = append(*logHandlers, bHandler)
+
+}
+
+func ConfigWriterOutput(logHandlers *[]slog.EntryHandler, lvl slf.Level, fd io.Writer) {
+	bHandler := New(lvl)
+	bHandler.SetWriter(fd)
+	*logHandlers = append(*logHandlers, bHandler)
+}
+
 // SetWriter defines the writer to use to output log strings (default: stderr).
 func (h *Handler) SetWriter(w io.Writer) {
 	h.writer = w
