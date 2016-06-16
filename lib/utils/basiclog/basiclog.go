@@ -5,7 +5,7 @@
 // the format of the output string (via Go templates), the format of date and time, the colouring
 // of entries in case of terminal output as well as the writer to redirect the output to. The
 // handler synchronises on write to allow the same handler to be used from concurrent routines.
-package basic
+package basiclog
 
 import (
 	"fmt"
