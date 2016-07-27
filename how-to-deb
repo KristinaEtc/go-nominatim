@@ -1,0 +1,2 @@
+fakeroot dpkg-deb --build go-stomp
+mv go-stomp.deb go-stomp_1.0-1_all.deb

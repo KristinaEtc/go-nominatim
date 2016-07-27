@@ -1,15 +1,17 @@
 package main
 
+import _ "github.com/KristinaEtc/slflog"
+
 import (
 	"Nominatim/lib"
 	"database/sql"
 	"encoding/json"
 	"flag"
-	"github.com/KristinaEtc/slflog"
+	"os"
+
 	"github.com/go-stomp/stomp"
 	_ "github.com/lib/pq"
 	"github.com/ventu-io/slf"
-	"os"
 )
 
 var (
@@ -17,9 +19,10 @@ var (
 	queueFormat = flag.String("qFormat", "/queue/", "queue format")
 	queueName   = flag.String("queue", "/queue/nominatimRequest", "Destination queue")
 
-	configFile = flag.String("config", "/opt/go-stomp/go-stomp-nominatim/config.json", "config file for Nominatim DB")
-	login      = flag.String("login", "client1", "Login for authorization")
-	passcode   = flag.String("pwd", "111", "Passcode for authorization")
+	configFile = flag.String("config", "/home/k/work/go/src/Nominatim/worker/config.json", "config file for Nominatim DB")
+	//configFile = flag.String("config", "/opt/go-stomp/go-stomp-nominatim/config.json", "config file for Nominatim DB")
+	login    = flag.String("login", "client1", "Login for authorization")
+	passcode = flag.String("pwd", "111", "Passcode for authorization")
 
 	logPath  = flag.String("logpath", "logs", "path to logfiles")
 	logLevel = flag.String("loglevel", "WARN", "IFOO, DEBUG, ERROR, WARN, PANIC, FATAL - loglevel for stderr")
@@ -52,12 +55,6 @@ type Params struct {
 	config         ConfigDB
 	db             *sql.DB
 }
-
-const (
-	errorFilename = "error.log"
-	infoFilename  = "info.log"
-	debugFilename = "debug.log"
-)
 
 var log slf.StructuredLogger
 
@@ -128,7 +125,6 @@ func getLocationJSON(data Nominatim.DataWithoutDetails) ([]byte, error) {
 		log.Error(err.Error())
 		return nil, err
 	}
-
 	return dataJSON, nil
 }
 
@@ -138,25 +134,22 @@ func requestLoop(subscribed chan bool, p *Params) {
 	}()
 
 	sqlOpenStr := "dbname=" + p.config.DBname +
-		" host=" + p.config.Host +
-		" user=" + p.config.User +
-		" password=" + p.config.Password
-
+		" host=" + p.config.Host
 	reverseGeocode, err := Nominatim.NewReverseGeocode(sqlOpenStr)
 	if err != nil {
-		log.Panic(err.Error())
+		log.WithCaller(slf.CallerShort).Panic(err.Error())
 	}
 	defer reverseGeocode.Close()
 
 	connSubsc, err := stomp.Dial("tcp", *serverAddr, options...)
 	if err != nil {
-		log.Errorf("cannot connect to server: %s", err.Error())
+		log.WithCaller(slf.CallerShort).Errorf("cannot connect to server (connSubsc): %s", err.Error())
 		return
 	}
 
 	connSend, err := stomp.Dial("tcp", *serverAddr, options...)
 	if err != nil {
-		log.Errorf("cannot connect to server: %s", err.Error())
+		log.WithCaller(slf.CallerShort).Errorf("cannot connect to server (connSend): %s", err.Error())
 		return
 	}
 
@@ -214,13 +207,11 @@ func (p *Params) configurateDB() {
 	}
 
 	log.Debug("db configurate done")
-
 }
 
 func main() {
 
 	flag.Parse()
-	slflog.InitLoggers(*logPath, *logLevel)
 	log = slf.WithContext("go-stompd-worker.go")
 
 	options = []func(*stomp.Conn) error{
@@ -230,6 +221,7 @@ func main() {
 
 	params := Params{}
 	params.configurateDB()
+	log.Debug(params.config.User)
 	subscribed := make(chan bool)
 	log.Info("starting working...")
 	go requestLoop(subscribed, &params)

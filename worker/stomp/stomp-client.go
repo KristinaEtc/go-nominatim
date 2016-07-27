@@ -12,8 +12,6 @@ import (
 	"path/filepath"
 )
 
-//var log l4g.Logger = l4g.NewLogger()
-
 const (
 	defaultPort = ":61613"
 	clientID    = "clientID"
@@ -36,78 +34,6 @@ var (
 var options []func(*stomp.Conn) error = []func(*stomp.Conn) error{
 	stomp.ConnOpt.Login("guest", "guest"),
 	stomp.ConnOpt.Host("/"),
-}
-
-const LogDir = "/home/k/work/go/src/Nominatim/worker/stomp/logs/"
-
-const (
-	errorFilename = "error.log"
-	infoFilename  = "info.log"
-	debugFilename = "debug.log"
-)
-
-var (
-	bhDebug, bhInfo, bhError, bhConsole     *basic.Handler
-	logfileInfo, logfileDebug, logfileError *os.File
-	lf                                      slog.LogFactory
-
-	log slf.StructuredLogger
-)
-
-func initLoggers() {
-
-	if *consoleMode == true {
-		lvl := getLogLevel(*logLevel)
-		bhConsole = basic.New(lvl)
-		bhConsole.SetWriter(os.Stdout)
-	}
-
-	bhDebug = basic.New(slf.LevelDebug)
-	bhInfo = basic.New()
-	bhError = basic.New(slf.LevelError)
-
-	// optionally define the format (this here is the default one)
-	bhInfo.SetTemplate("{{.Time}} [\033[{{.Color}}m{{.Level}}\033[0m] {{.Context}}{{if .Caller}} ({{.Caller}}){{end}}: {{.Message}}{{if .Error}} (\033[31merror: {{.Error}}\033[0m){{end}} {{.Fields}}")
-
-	// TODO: create directory in /var/log, if in linux:
-	// if runtime.GOOS == "linux" {
-	os.Mkdir("."+string(filepath.Separator)+LogDir, 0766)
-
-	// interestings with err: if not initialize err before,
-	// how can i use global logfileInfo?
-	var err error
-	logfileInfo, err = os.OpenFile(LogDir+infoFilename, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0666)
-	if err != nil {
-		log.Panicf("Could not open/create %s logfile", LogDir+infoFilename)
-	}
-
-	logfileDebug, err = os.OpenFile(LogDir+debugFilename, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0666)
-	if err != nil {
-		log.Panicf("Could not open/create logfile", LogDir+debugFilename)
-	}
-
-	logfileError, err = os.OpenFile(LogDir+errorFilename, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0666)
-	if err != nil {
-		log.Panicf("Could not open/create logfile", LogDir+errorFilename)
-	}
-
-	bhDebug.SetWriter(logfileDebug)
-	bhInfo.SetWriter(logfileInfo)
-	bhError.SetWriter(logfileError)
-
-	lf = slog.New()
-	lf.SetLevel(slf.LevelDebug) //lf.SetLevel(slf.LevelDebug, "app.package1", "app.package2")
-
-	if *consoleMode == true {
-		lf.SetEntryHandlers(bhInfo, bhError, bhDebug, bhConsole)
-	} else {
-		lf.SetEntryHandlers(bhInfo, bhError, bhDebug)
-	}
-
-	// make this into the one used by all the libraries
-	slf.Set(lf)
-
-	log = slf.WithContext("main-client.go")
 }
 
 func sendMessages() {
@@ -198,13 +124,9 @@ func recvMessages(subscribed chan bool) {
 
 func main() {
 
-	flag.Parsed()
 	flag.Parse()
-
-	initLoggers()
-	defer logfileInfo.Close()
-	defer logfileDebug.Close()
-	defer logfileError.Close()
+	slflog.InitLoggers(*logPath, *logLevel)
+	log := slf.WithContext("stomp-client.go")
 
 	options = []func(*stomp.Conn) error{
 		stomp.ConnOpt.Login(*login, *passcode),
@@ -222,28 +144,4 @@ func main() {
 
 	<-stop
 	<-stop
-}
-
-func getLogLevel(lvl string) slf.Level {
-
-	switch lvl {
-	case slf.LevelDebug.String():
-		return slf.LevelDebug
-
-	case slf.LevelInfo.String():
-		return slf.LevelInfo
-
-	case slf.LevelWarn.String():
-		return slf.LevelWarn
-
-	case slf.LevelError.String():
-		return slf.LevelError
-
-	case slf.LevelFatal.String():
-		return slf.LevelFatal
-	case slf.LevelPanic.String():
-		return slf.LevelPanic
-	default:
-		return slf.LevelDebug
-	}
 }
