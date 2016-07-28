@@ -1,21 +1,23 @@
 package main
 
+//important: do not move
+import _ "github.com/KristinaEtc/slflog"
+
 import (
-	"Nominatim/lib/utils/basic"
 	"Nominatim/lib/utils/fileproc"
 	"Nominatim/lib/utils/request"
 	"flag"
+
 	"github.com/go-stomp/stomp"
 	"github.com/ventu-io/slf"
-	"github.com/ventu-io/slog"
-	"os"
-	"path/filepath"
 )
 
 const (
-	defaultPort = ":61613"
+	defaultPort = ":61614"
 	clientID    = "clientID"
 )
+
+var log = slf.WithContext("go-stomp-nominatimClient.go")
 
 var (
 	serverAddr  = flag.String("server", "localhost:61614", "STOMP server endpoint")
@@ -23,10 +25,7 @@ var (
 	queueFormat = flag.String("queue", "/queue/", "Queue format")
 	login       = flag.String("login", "client1", "Login for authorization")
 	passcode    = flag.String("pwd", "111", "Passcode for authorization")
-	testFile    = flag.String("testfile", "../test.csv", "testfile with coordinates")
-
-	logLevel    = flag.String("loglevel", "INFO", "IFOO, DEBUG, ERROR, WARN, PANIC, FATAL")
-	consoleMode = flag.Bool("console", true, "Console output")
+	testFile    = flag.String("testfile", "test.csv", "testfile with coordinates")
 
 	stop = make(chan bool)
 )
@@ -125,8 +124,6 @@ func recvMessages(subscribed chan bool) {
 func main() {
 
 	flag.Parse()
-	slflog.InitLoggers(*logPath, *logLevel)
-	log := slf.WithContext("stomp-client.go")
 
 	options = []func(*stomp.Conn) error{
 		stomp.ConnOpt.Login(*login, *passcode),

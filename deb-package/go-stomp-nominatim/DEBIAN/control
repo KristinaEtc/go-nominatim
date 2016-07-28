@@ -1,0 +1,9 @@
+Package: go-stomp-nominatim
+Version: 2016.07.27-beta1.1
+Maintainer: Kristina <isitiriss@gmail.com>
+Architecture: amd64
+Section: devel
+Description: A package which provides a stomp-nominatim-converter written in Go.
+Installed-Size: ?
+Priority: extra
+

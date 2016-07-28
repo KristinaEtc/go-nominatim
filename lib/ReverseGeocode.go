@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	//"fmt"
 	_ "github.com/lib/pq"
+	"github.com/ventu-io/slf"
 	//"strconv"
 	"errors"
 )
@@ -53,7 +54,6 @@ func NewReverseGeocode(sqlOpenStr string) (*ReverseGeocode, error) {
 	db, err := sql.Open("postgres", sqlOpenStr)
 	if err != nil {
 		return nil, err
-
 	}
 	r := ReverseGeocode{db: db}
 	//log.Println(r.db)
@@ -169,17 +169,17 @@ func (r *ReverseGeocode) Lookup() (*DataWithoutDetails, error) {
 			iMaxRank = 26
 		}
 
-		sSQL = `select place_id,parent_place_id,rank_search 
+		sSQL = `select place_id,parent_place_id,rank_search
 		            from placex
-			WHERE ST_DWithin(ST_SetSRID(ST_Point($1,$2),4326), geometry, $3) and  
-			      rank_search != 28 and 
-			      rank_search >= $4 and 
-			      (name is not null or housenumber is not null) and 
-			      class not in ('waterway','railway','tunnel','bridge') and 
-			      indexed_status = 0 and 
-			      (ST_GeometryType(geometry) not in ('ST_Polygon','ST_MultiPolygon') OR 
-			       ST_DWithin(ST_SetSRID(ST_Point($1,$2),4326), centroid, $3)) 
-			ORDER BY ST_distance(ST_SetSRID(ST_Point($1,$2),4326), geometry) 
+			WHERE ST_DWithin(ST_SetSRID(ST_Point($1,$2),4326), geometry, $3) and
+			      rank_search != 28 and
+			      rank_search >= $4 and
+			      (name is not null or housenumber is not null) and
+			      class not in ('waterway','railway','tunnel','bridge') and
+			      indexed_status = 0 and
+			      (ST_GeometryType(geometry) not in ('ST_Polygon','ST_MultiPolygon') OR
+			       ST_DWithin(ST_SetSRID(ST_Point($1,$2),4326), centroid, $3))
+			ORDER BY ST_distance(ST_SetSRID(ST_Point($1,$2),4326), geometry)
 			ASC limit 1
 			`
 
@@ -191,7 +191,7 @@ func (r *ReverseGeocode) Lookup() (*DataWithoutDetails, error) {
 			//return nil, err
 			continue
 		case err != nil:
-			log.Panicf("QueryRow", err.Error())
+			log.WithCaller(slf.CallerShort).Fatalf("QueryRow %s", err.Error())
 		default:
 			//log.Println("QueryRow result:", iPlaceID, iParentPlace, iRank)
 		}
@@ -206,9 +206,9 @@ func (r *ReverseGeocode) Lookup() (*DataWithoutDetails, error) {
 			log.Debugf("use parent place: %d", iParentPlace)
 		}
 
-		sSQL = `select address_place_id 
+		sSQL = `select address_place_id
 				from place_addressline where place_id = $1
-				order by abs(cached_rank_address - $2) 
+				order by abs(cached_rank_address - $2)
 				asc,cached_rank_address desc,isaddress desc,distance desc limit 1
 			`
 		err := r.db.QueryRow(sSQL, iPlaceID, iMaxRank).Scan(&iNewPlaceID)
@@ -216,7 +216,7 @@ func (r *ReverseGeocode) Lookup() (*DataWithoutDetails, error) {
 		case err == sql.ErrNoRows:
 			break
 		case err != nil:
-			log.Fatalf("QueryRow: %v", err.Error())
+			log.WithCaller(slf.CallerShort).Fatalf("QueryRow: %s", err.Error())
 		default:
 			//log.Println("address_place_id:", iNewPlaceID)
 			if iNewPlaceID.Valid {
