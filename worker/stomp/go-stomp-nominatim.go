@@ -18,7 +18,7 @@ import (
 )
 
 /*go build -ldflags "-X github.com/KristinaEtc/slflog.configLogFile=/usr/share/go-stomp-nominatim/go-stomp-nominatim.logconfig
--X go-stomp-worker.configFile=/usr/share/go-stomp-nominatim/go-stomp-nominatim.config" go-stomp-nominatim.go */
+-X main.configFile=/usr/share/go-stomp-nominatim/go-stomp-nominatim.config" go-stomp-nominatim.go */
 var configFile string
 
 var log = slf.WithContext("go-stomp-nominatim.go")
@@ -239,7 +239,6 @@ func main() {
 func getPathToConfig() string {
 
 	var path = configFile
-	log.Debug(path)
 
 	// path to config was setted by a linker value
 	if path != "" {
