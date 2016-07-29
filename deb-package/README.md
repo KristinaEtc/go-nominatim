@@ -169,7 +169,8 @@ go-stomp-server также прекращает работу и его тоже 
 
 4. Как-то проверять установленную БД Nominatim при установке go-stomp-nominatim?
 
-5.```
+5. Исправить:
+```
 13:28:48.285 [ERROR] github.com/go-stomp/stomp/server/client: read failed: invalid frame format: 192.168.240.105:53944,<br/ >
 13:28:55.705 [ERROR] github.com/go-stomp/stomp/server/client: read failed: invalid command: 192.168.240.105:54065,<br/ >
 ```
