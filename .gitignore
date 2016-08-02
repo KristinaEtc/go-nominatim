@@ -12,3 +12,4 @@ worker/config.json
 worker/stomp/worker.log*
 worker/stomp/logs
 worker/stomp/stomp-worker
+worker/stomp/Makefile
