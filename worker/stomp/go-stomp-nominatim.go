@@ -172,6 +172,8 @@ func requestLoop(subscribed chan bool, p *Params) {
 		" user=" + p.config.User +
 		" password=" + p.config.Password
 
+	log.Error(sqlOpenStr)
+
 	reverseGeocode, err := Nominatim.NewReverseGeocode(sqlOpenStr)
 	if err != nil {
 		log.WithCaller(slf.CallerShort).Error(err.Error())

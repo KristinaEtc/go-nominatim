@@ -43,18 +43,9 @@ type GlobalConf struct {
 	TestFile       string
 }
 
-// NominatimConf options
-type NominatimConf struct {
-	User     string
-	Password string
-	Host     string
-	DBname   string
-}
-
 // ConfFile is a file with all program options
 type ConfFile struct {
-	Global      GlobalConf
-	NominatimDB NominatimConf
+	Global GlobalConf
 }
 
 var globalOpt = ConfFile{
@@ -66,12 +57,6 @@ var globalOpt = ConfFile{
 		ServerPassword: "",
 		TestFile:       "test.csv",
 		DestinQueue:    "/queue/nominatimRequest",
-	},
-	NominatimDB: NominatimConf{
-		DBname:   "nominatim",
-		Host:     "localhost",
-		User:     "geocode1",
-		Password: "_geocode1#",
 	},
 }
 
