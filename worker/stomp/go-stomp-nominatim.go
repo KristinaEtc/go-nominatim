@@ -1,48 +1,78 @@
 package main
 
-//important: do not move
-import _ "github.com/KristinaEtc/slflog"
-
+//important: must execute first; do not move
 import (
 	"Nominatim/lib"
 	"database/sql"
 	"encoding/json"
-	"flag"
-	"os"
 
+	_ "github.com/KristinaEtc/slflog"
+	"github.com/KristinaEtc/utils"
 	"github.com/go-stomp/stomp"
-	"github.com/kardianos/osext"
 
 	_ "github.com/lib/pq"
 	"github.com/ventu-io/slf"
 )
 
-/*go build -ldflags "-X github.com/KristinaEtc/slflog.configLogFile=/usr/share/go-stomp-nominatim/go-stomp-nominatim.logconfig
--X main.configFile=/usr/share/go-stomp-nominatim/go-stomp-nominatim.config" go-stomp-nominatim.go */
-var configFile string
-
 var log = slf.WithContext("go-stomp-nominatim.go")
 
-var (
-	serverAddr  = flag.String("server", "localhost:61614", "STOMP server endpoint")
-	queueFormat = flag.String("qFormat", "/queue/", "queue format")
-	queueName   = flag.String("queue", "/queue/nominatimRequest", "Destination queue")
+/*-------------------------
+	Config option structures
+-------------------------*/
 
-	configFileNominatim = flag.String("conf", getPathToConfig(), "config file for Nominatim DB")
-	login               = flag.String("login", "client1", "Login for authorization")
-	passcode            = flag.String("pwd", "111", "Passcode for authorization")
-)
+var configFile string
+
+// GlobalConf is a struct with global options,
+// like server address and queue format, etc.
+type GlobalConf struct {
+	ServerAddr     string
+	ServerUser     string
+	ServerPassword string
+	QueueFormat    string
+	QueueName      string
+}
+
+// NominatimConf options
+type NominatimConf struct {
+	User     string
+	Password string
+	Host     string
+	DBname   string
+}
+
+// ConfFile is a file with all program options
+type ConfFile struct {
+	Global      GlobalConf
+	NominatimDB NominatimConf
+}
+
+var globalOpt = ConfFile{
+	Global: GlobalConf{
+		ServerAddr:     "localhost:61614",
+		QueueFormat:    "/queue/",
+		QueueName:      "/queue/nominatimRequest",
+		ServerUser:     "",
+		ServerPassword: "",
+	},
+	NominatimDB: NominatimConf{
+		DBname:   "nominatim",
+		Host:     "localhost",
+		User:     "geocode1",
+		Password: "_geocode1#",
+	},
+}
+
+/*-------------------------
+	Geolocation and
+	request's structures
+-------------------------*/
 
 var stop = make(chan bool)
 
-var options []func(*stomp.Conn) error = []func(*stomp.Conn) error{
+/*var options []func(*stomp.Conn) error = []func(*stomp.Conn) error{
 	stomp.ConnOpt.Login("guest", "guest"),
 	stomp.ConnOpt.Host("/"),
-}
-
-type ConfigDB struct {
-	DBname, Host, User, Password string
-}
+}*/
 
 type Req struct {
 	Lat      float64
@@ -57,7 +87,7 @@ type Params struct {
 	format         string
 	addressDetails bool
 	sqlOpenStr     string
-	config         ConfigDB
+	config         NominatimConf
 	db             *sql.DB
 }
 
@@ -143,25 +173,31 @@ func requestLoop(subscribed chan bool, p *Params) {
 
 	reverseGeocode, err := Nominatim.NewReverseGeocode(sqlOpenStr)
 	if err != nil {
-		log.WithCaller(slf.CallerShort).Panic(err.Error())
+		log.WithCaller(slf.CallerShort).Error(err.Error())
 	}
 	defer reverseGeocode.Close()
 
-	connSubsc, err := stomp.Dial("tcp", *serverAddr, options...)
+	var options = []func(*stomp.Conn) error{
+		stomp.ConnOpt.Login(globalOpt.Global.ServerUser, globalOpt.Global.ServerPassword),
+		stomp.ConnOpt.Host(globalOpt.Global.ServerAddr),
+	}
+
+	connSubsc, err := stomp.Dial("tcp", globalOpt.Global.ServerAddr, options...)
 	if err != nil {
 		log.WithCaller(slf.CallerShort).Errorf("cannot connect to server (connSubsc): %s", err.Error())
 		return
 	}
 
-	connSend, err := stomp.Dial("tcp", *serverAddr, options...)
+	connSend, err := stomp.Dial("tcp", globalOpt.Global.ServerAddr, options...)
 	if err != nil {
 		log.WithCaller(slf.CallerShort).Errorf("cannot connect to server (connSend): %s", err.Error())
 		return
 	}
 
-	sub, err := connSubsc.Subscribe(*queueName, stomp.AckAuto)
+	sub, err := connSubsc.Subscribe(globalOpt.Global.QueueName, stomp.AckAuto)
 	if err != nil {
-		log.WithCaller(slf.CallerShort).Errorf("cannot subscribe to %s: %s", *queueName, err.Error())
+		log.WithCaller(slf.CallerShort).Errorf("cannot subscribe to %s: %s",
+			globalOpt.Global.QueueName, err.Error())
 		return
 	}
 	close(subscribed)
@@ -183,7 +219,7 @@ func requestLoop(subscribed chan bool, p *Params) {
 
 		log.Debugf("whoToSent %s", *whoToSent)
 
-		err = connSend.Send(*queueFormat+*whoToSent, "text/plain",
+		err = connSend.Send(globalOpt.Global.QueueFormat+*whoToSent, "text/plain",
 			[]byte(reqJSON), nil...)
 		if err != nil {
 			log.WithCaller(slf.CallerShort).Errorf("Failed to send to server %s", err)
@@ -194,86 +230,25 @@ func requestLoop(subscribed chan bool, p *Params) {
 	}
 }
 
-func (p *Params) configurateDB() {
-
-	file, err := os.Open(*configFileNominatim)
-	if err != nil {
-		log.WithCaller(slf.CallerShort).Error("No configurate file")
-	} else {
-
-		defer file.Close()
-		decoder := json.NewDecoder(file)
-		configuration := ConfigDB{}
-
-		err := decoder.Decode(&configuration)
-		if err != nil {
-			log.WithCaller(slf.CallerShort).Errorf("error: %v", err.Error())
-		}
-		p.config = configuration
-	}
+func (p *Params) configurateFromConfFile() {
+	utils.GetFromGlobalConf(&globalOpt, "go-stomp-nominatim options")
+	p.config = globalOpt.NominatimDB
 
 	log.Debug("db configurate done")
 }
 
 func main() {
 
-	flag.Parse()
 	log = slf.WithContext("go-stomp-nominatim.go")
 
-	options = []func(*stomp.Conn) error{
-		stomp.ConnOpt.Login(*login, *passcode),
-		stomp.ConnOpt.Host("/"),
-	}
-
 	params := Params{}
-	params.configurateDB()
+	params.configurateFromConfFile()
 	log.Debug(params.config.User)
+
 	subscribed := make(chan bool)
-	log.Error("--------------------------new connection---------------------")
-	log.WithCaller(slf.CallerShort).Info("starting working...")
+	log.Error("----------------------------------------------")
+	log.Info("Starting working...")
 	go requestLoop(subscribed, &params)
 
 	<-stop
-}
-
-func getPathToConfig() string {
-
-	var path = configFile
-
-	// path to config was setted by a linker value
-	if path != "" {
-		exist, err := exists(path)
-		if err != nil {
-			log.WithCaller(slf.CallerShort).Errorf("Error: wrong configure file from linker value %s: %s\n", path, err.Error())
-			path = ""
-		} else if exist != true {
-			log.WithCaller(slf.CallerShort).Errorf("Error: Configure file from linker value %s: does not exist\n", path)
-			path = ""
-		}
-	}
-
-	// no path from a linker value or wrong linker value; searching where a binary is situated
-	if path == "" {
-		pathTemp, err := osext.Executable()
-		if err != nil {
-			log.WithCaller(slf.CallerShort).Errorf("Error: could not get a path to binary file for getting configfile: %s\n", err.Error())
-		} else {
-			path = pathTemp + ".config"
-		}
-	}
-	log.WithCaller(slf.CallerShort).Infof("Configfile that will be used: [%s]", path)
-	return path
-}
-
-// Exists returns whether the given file or directory exists or not.
-func exists(path string) (bool, error) {
-
-	_, err := os.Stat(path)
-	if err == nil {
-		return true, nil
-	}
-	if os.IsNotExist(err) {
-		return false, nil
-	}
-	return false, err
 }
