@@ -4,7 +4,6 @@ package main
 import _ "github.com/KristinaEtc/slflog"
 
 import (
-	"database/sql"
 	"encoding/json"
 
 	"github.com/KristinaEtc/go-nominatim/lib"
@@ -87,9 +86,25 @@ type Params struct {
 	clientReq      Req
 	format         string
 	addressDetails bool
-	sqlOpenStr     string
-	config         NominatimConf
-	db             *sql.DB
+	//sqlOpenStr     string
+	//config         NominatimConf
+	//db             *sql.DB
+}
+
+type ErrorResponse struct {
+	Type    string
+	Message string
+}
+
+func createErrResponse(err error) []byte {
+	respJSON := ErrorResponse{Type: "error", Message: err.Error()}
+
+	bytes, err := json.Marshal(respJSON)
+	if err != nil {
+		log.WithCaller(slf.CallerShort).Error(err.Error())
+		return nil
+	}
+	return bytes
 }
 
 func (p *Params) locationSearch(rawMsg []byte, geocode *Nominatim.ReverseGeocode) ([]byte, *string, error) {
@@ -103,22 +118,22 @@ func (p *Params) locationSearch(rawMsg []byte, geocode *Nominatim.ReverseGeocode
 	}
 	log.Debug("addCoordinatesToStruct done")
 
+	whoToSent := p.clientReq.ClientID
+
 	place, err := p.getLocationFromNominatim(geocode)
 	if err != nil {
 		log.WithCaller(slf.CallerShort).Error(err.Error())
-		return nil, nil, err
+		return createErrResponse(err), &whoToSent, nil
 	}
 
 	log.Debug("getLocationFromNominatim done")
 	placeJSON, err := getLocationJSON(*place)
 	if err != nil {
 		log.WithCaller(slf.CallerShort).Error(err.Error())
-		return nil, nil, err
+		return createErrResponse(err), &whoToSent, nil
 	}
 
 	log.Debug("getLocationJSON done")
-
-	whoToSent := p.clientReq.ClientID
 
 	log.Infof("%s %d", p.clientReq.ClientID, p.clientReq.ID)
 
@@ -162,15 +177,15 @@ func getLocationJSON(data Nominatim.DataWithoutDetails) ([]byte, error) {
 	return dataJSON, nil
 }
 
-func requestLoop(subscribed chan bool, p *Params) {
+func requestLoop(subscribed chan bool) {
 	defer func() {
 		stop <- true
 	}()
 
-	sqlOpenStr := "dbname=" + p.config.DBname +
-		" host=" + p.config.Host +
-		" user=" + p.config.User +
-		" password=" + p.config.Password
+	sqlOpenStr := "dbname=" + globalOpt.NominatimDB.DBname +
+		" host=" + globalOpt.NominatimDB.Host +
+		" user=" + globalOpt.NominatimDB.User +
+		" password=" + globalOpt.NominatimDB.Password
 
 	log.Error(sqlOpenStr)
 
@@ -213,17 +228,20 @@ func requestLoop(subscribed chan bool, p *Params) {
 		}
 
 		reqJSON := msg.Body
-
-		reqJSON, whoToSent, err := p.locationSearch(msg.Body, reverseGeocode)
+		var p Params
+		replyJSON, whoToSent, err := p.locationSearch(reqJSON, reverseGeocode)
 		if err != nil {
-			log.WithCaller(slf.CallerShort).Error("Error: converting request to json")
-			return
+			log.WithCaller(slf.CallerShort).Errorf("Error: locationSearch %s", err.Error())
+			continue
+		}
+		if replyJSON == nil {
+			continue
 		}
 
 		log.Debugf("whoToSent %s", *whoToSent)
 
 		err = connSend.Send(globalOpt.Global.QueueFormat+*whoToSent, "text/plain",
-			[]byte(reqJSON), nil...)
+			[]byte(replyJSON), nil...)
 		if err != nil {
 			log.WithCaller(slf.CallerShort).Errorf("Failed to send to server %s", err)
 			return
@@ -233,25 +251,17 @@ func requestLoop(subscribed chan bool, p *Params) {
 	}
 }
 
-func (p *Params) configurateFromConfFile() {
-	utils.GetFromGlobalConf(&globalOpt, "go-stomp-nominatim options")
-	p.config = globalOpt.NominatimDB
-
-	log.Debug("db configurate done")
-}
-
 func main() {
 
 	log = slf.WithContext("go-stomp-nominatim.go")
 
-	params := Params{}
-	params.configurateFromConfFile()
-	log.Debug(params.config.User)
+	//params := Params{}
+	utils.GetFromGlobalConf(&globalOpt, "go-stomp-nominatim options")
 
 	subscribed := make(chan bool)
 	log.Error("----------------------------------------------")
 	log.Info("Starting working...")
-	go requestLoop(subscribed, &params)
+	go requestLoop(subscribed)
 
 	<-stop
 }

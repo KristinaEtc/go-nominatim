@@ -19,13 +19,13 @@ type ReverseGeocode struct {
 }
 
 type DataWithoutDetails struct {
-	Place_id    string `Place_id`
-	Osm_type    string `Osm_type`
-	Osm_id      string `Osm_id`
-	Lat         string `Lat`
-	Lon         string `Lon`
-	Langaddress string `Langaddress`
-	ID          int    `ID`
+	Place_id    string
+	Osm_type    string
+	Osm_id      string
+	Lat         string
+	Lon         string
+	Langaddress string
+	ID          int
 }
 
 func (d DataWithoutDetails) String() string {
@@ -191,7 +191,8 @@ func (r *ReverseGeocode) Lookup() (*DataWithoutDetails, error) {
 			//return nil, err
 			continue
 		case err != nil:
-			log.WithCaller(slf.CallerShort).Fatalf("QueryRow %s", err.Error())
+			log.WithCaller(slf.CallerShort).Errorf("QueryRow %s", err.Error())
+			return nil, err
 		default:
 			//log.Println("QueryRow result:", iPlaceID, iParentPlace, iRank)
 		}
@@ -216,7 +217,8 @@ func (r *ReverseGeocode) Lookup() (*DataWithoutDetails, error) {
 		case err == sql.ErrNoRows:
 			break
 		case err != nil:
-			log.WithCaller(slf.CallerShort).Fatalf("QueryRow: %s", err.Error())
+			log.WithCaller(slf.CallerShort).Errorf("QueryRow: %s", err.Error())
+			return nil, err
 		default:
 			//log.Println("address_place_id:", iNewPlaceID)
 			if iNewPlaceID.Valid {
