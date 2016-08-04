@@ -13,3 +13,5 @@ worker/stomp/worker.log*
 worker/stomp/logs
 worker/stomp/stomp-worker
 worker/stomp/Makefile
+worker/stomp/go-stomp-client
+worker/stomp/go-stomp-nominatim
