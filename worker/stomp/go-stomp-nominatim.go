@@ -1,12 +1,13 @@
 package main
 
 //important: must execute first; do not move
+import _ "github.com/KristinaEtc/slflog"
+
 import (
-	"Nominatim/lib"
 	"database/sql"
 	"encoding/json"
 
-	_ "github.com/KristinaEtc/slflog"
+	"github.com/KristinaEtc/go-nominatim/lib"
 	"github.com/KristinaEtc/utils"
 	"github.com/go-stomp/stomp"
 
