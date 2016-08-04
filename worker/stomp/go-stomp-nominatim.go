@@ -6,10 +6,9 @@ import _ "github.com/KristinaEtc/slflog"
 import (
 	"encoding/json"
 
+	"github.com/KristinaEtc/config"
 	"github.com/KristinaEtc/go-nominatim/lib"
-	"github.com/KristinaEtc/utils"
 	"github.com/go-stomp/stomp"
-
 	_ "github.com/lib/pq"
 	"github.com/ventu-io/slf"
 )
@@ -19,8 +18,6 @@ var log = slf.WithContext("go-stomp-nominatim.go")
 /*-------------------------
 	Config option structures
 -------------------------*/
-
-var configFile string
 
 // GlobalConf is a struct with global options,
 // like server address and queue format, etc.
@@ -187,7 +184,7 @@ func requestLoop(subscribed chan bool) {
 		" user=" + globalOpt.NominatimDB.User +
 		" password=" + globalOpt.NominatimDB.Password
 
-	log.Error(sqlOpenStr)
+	log.WithCaller(slf.CallerShort).Debugf("sqlOpenStr=%s", sqlOpenStr)
 
 	reverseGeocode, err := Nominatim.NewReverseGeocode(sqlOpenStr)
 	if err != nil {
@@ -256,7 +253,7 @@ func main() {
 	log = slf.WithContext("go-stomp-nominatim.go")
 
 	//params := Params{}
-	utils.GetFromGlobalConf(&globalOpt, "go-stomp-nominatim options")
+	config.ReadGlobalConfig(&globalOpt, "go-stomp-nominatim options")
 
 	subscribed := make(chan bool)
 	log.Error("----------------------------------------------")

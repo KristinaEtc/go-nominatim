@@ -1,11 +1,14 @@
 package main
 
-//important: do not move
+//important: must execute first; do not move
+import _ "github.com/KristinaEtc/slflog"
+
 import (
 	"github.com/KristinaEtc/go-nominatim/lib/utils/fileproc"
 	"github.com/KristinaEtc/go-nominatim/lib/utils/request"
 	_ "github.com/KristinaEtc/slflog"
-	u "github.com/KristinaEtc/utils"
+	//	u "github.com/KristinaEtc/utils"
+	"github.com/KristinaEtc/config"
 	"github.com/go-stomp/stomp"
 	"github.com/ventu-io/slf"
 )
@@ -169,7 +172,7 @@ func main() {
 
 	subscribed := make(chan bool)
 
-	u.GetFromGlobalConf(&globalOpt, "go-stomp-client options")
+	config.ReadGlobalConfig(&globalOpt, "go-stomp-client options")
 
 	log.Info("starting working...")
 
