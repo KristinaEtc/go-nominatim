@@ -59,7 +59,7 @@ getbin:
 
 clean:
 	@echo -n "Deleting unnecessary files..."
-	rm -r autom4te.cache/ backup-*tgz config.status configure *.deb config.log
+	rm -r backup-*tgz
 
 install: info makedir configure getlibs getbin
 
