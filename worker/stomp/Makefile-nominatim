@@ -9,7 +9,7 @@ GOGET=$(GO) get
 
 EXENAME = go-stomp-nominatim
 #BUILDPATH ="/usr/local/$(EXENAME)"
-BUILDPATH = @prefix@
+BUILDPATH = /
 
 logdir = "/var/log/${EXENAME}"
 bindir = "/usr/bin"
@@ -17,17 +17,17 @@ demondir = "/etc/init"
 confdir = "/etc/${EXENAME}"
 
 CONF = "${EXENAME}.config"
-LOGCONF = "${EXENAME}.logconfig"
+#LOGCONF = "${EXENAME}.logconfig"
 DEMONF = "${EXENAME}.conf"
 
 GOFLAGS = "-o ${EXENAME} \
-	  -ldflags \"-X github.com/KristinaEtc/slflog.configLogFile=${confdir}/${LOGCONF} \
-	  -X main.configFile=${confdir}/${CONF}\" "
+	  -ldflags \"-X github.com/KristinaEtc/config.configPath=${confdir}/${CONF} \
+	  -X github.com/KristinaEtc/config.CallerInfo=true\" "
 
 all: build
 
 info:
-	@echo "Makefile for go-stomp-server. Installing..."
+	@echo "Makefile for go-stomp-nominatim. Installing..."
 	@echo "${BUILDPATH}"
 
 makedir:
@@ -42,7 +42,6 @@ makedir:
 configure:
 	@echo -n "Preparing config files... "
 	@cp ${CONF} ${confdir}/${CONF}
-	@cp ${LOGCONF} ${confdir}/
 	@cp ${DEMONF} ${demondir}
 	@echo "Done."
 

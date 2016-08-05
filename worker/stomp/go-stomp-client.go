@@ -96,7 +96,8 @@ func sendMessages() {
 
 	fs, err := fileproc.NewFileScanner(globalOpt.Global.TestFile)
 	if err != nil {
-		log.Panic(err.Error())
+		log.Error(err.Error())
+		return
 	}
 	defer fs.Close()
 
