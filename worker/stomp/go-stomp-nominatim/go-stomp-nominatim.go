@@ -41,7 +41,7 @@ type NominatimConf struct {
 type ConfFile struct {
 	Global      GlobalConf
 	NominatimDB NominatimConf
-}
+}D
 
 var globalOpt = ConfFile{
 	Global: GlobalConf{
