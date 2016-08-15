@@ -59,7 +59,7 @@ var globalOpt = ConfFile{
 		ServerUser:     "",
 		ServerPassword: "",
 		TestFile:       "test.csv",
-		DestinQueue:    "/queue/nominatimRequest",
+		DestinQueue:    "TestDest",
 	},
 }
 
