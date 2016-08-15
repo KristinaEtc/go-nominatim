@@ -6,8 +6,11 @@ worker/logfile*
 worker/nsqd/test-client
 worker/nsqd/worker
 worker/stomp/go-stomp-*/logs
+worker/stomp/go-stomp-*/log
 worker/stomp/go-stomp-nominatim/go-stomp-nominatim
 worker/stomp/go-stomp-client/go-stomp-client
 worker/stomp/go-stomp-*/*.deb
+worker/stomp/go-stomp-*/*.exe
+
 .vscode
 
