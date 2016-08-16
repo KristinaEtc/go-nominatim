@@ -1,9 +1,0 @@
-{
-	"Filenames": {
-		"ERROR": "errors.log",
-		"INFO": "info.log",
-		"DEBUG": "debug.log"
-	},
-	"Stderr":"DEBUG",
-	"Logpath": "logs"
-}
