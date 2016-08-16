@@ -22,6 +22,7 @@ var (
 	GitBranch  string
 	GitState   string
 	GitSummary string
+        Version string
 )
 
 /*-------------------------
@@ -272,6 +273,7 @@ func main() {
 	log.Infof("GitBranch=%s\n", GitBranch)
 	log.Infof("GitState=%s\n", GitState)
 	log.Infof("GitSummary=%s\n", GitSummary)
+        log.Infof("VERSION=%s\n", Version)
 
 	log.Info("Starting working...")
 	go requestLoop(subscribed)
