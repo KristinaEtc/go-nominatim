@@ -27,7 +27,7 @@ var (
 )
 
 /*-------------------------
-	Config option structures
+  Config option structures
 -------------------------*/
 
 // GlobalConf is a struct with global options,
@@ -71,15 +71,15 @@ var globalOpt = ConfFile{
 }
 
 /*-------------------------
-	Geolocation and
-	request's structures
+  Geolocation and
+  request's structures
 -------------------------*/
 
 var stop = make(chan bool)
 
 /*var options []func(*stomp.Conn) error = []func(*stomp.Conn) error{
-	stomp.ConnOpt.Login("guest", "guest"),
-	stomp.ConnOpt.Host("/"),
+  stomp.ConnOpt.Login("guest", "guest"),
+  stomp.ConnOpt.Host("/"),
 }*/
 
 type Req struct {
