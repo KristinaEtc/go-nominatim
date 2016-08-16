@@ -37,13 +37,15 @@ var configFile string
 // GlobalConf is a struct with global options,
 // like server address and queue format, etc.
 type GlobalConf struct {
-	ServerAddr     string
-	ServerUser     string
-	ServerPassword string
-	QueueFormat    string
-	QueueName      string
-	DestinQueue    string
-	TestFile       string
+	ServerAddr          string
+	ServerUser          string
+	ServerPassword      string
+	QueueFormat         string
+	QueueName           string
+	DestinQueue         string
+	TestFile            string
+	ClientID            string
+	MessageDumpInterval int
 }
 
 // ConfFile is a file with all program options
@@ -53,13 +55,15 @@ type ConfFile struct {
 
 var globalOpt = ConfFile{
 	Global: GlobalConf{
-		ServerAddr:     "localhost:61614",
-		QueueFormat:    "/queue/",
-		QueueName:      "/queue/nominatimRequest",
-		ServerUser:     "",
-		ServerPassword: "",
-		TestFile:       "test.csv",
-		DestinQueue:    "TestDest",
+		ServerAddr:          "localhost:61614",
+		QueueFormat:         "/queue/",
+		QueueName:           "/queue/nominatimRequest",
+		ServerUser:          "",
+		ServerPassword:      "",
+		TestFile:            "test.csv",
+		DestinQueue:         "/queue/nominatimRequest",
+		ClientID:            "clientID",
+		MessageDumpInterval: 20,
 	},
 }
 
@@ -76,6 +80,11 @@ func sendMessages() {
 	defer func() {
 		stop <- true
 	}()
+
+	if globalOpt.Global.TestFile == "" {
+		log.Infof("No test file, stopping sendMessages")
+		return
+	}
 
 	options = []func(*stomp.Conn) error{
 		stomp.ConnOpt.Login(globalOpt.Global.ServerUser, globalOpt.Global.ServerPassword),
@@ -110,7 +119,7 @@ func sendMessages() {
 
 		log.Debugf("locs: %s", locs)
 
-		reqInJSON, err := request.MakeReq(locs, clientID, i)
+		reqInJSON, err := request.MakeReq(locs, globalOpt.Global.ClientID, i)
 		//reqInJSON, err := request.MakeReq(locs, clientID, i, log)
 		if err != nil {
 			log.Error("Could not get coordinates in JSON: wrong format")
@@ -144,11 +153,12 @@ func recvMessages(subscribed chan bool) {
 		return
 	}
 
-	log.Debugf("Subscribing to %s", globalOpt.Global.QueueFormat+clientID)
+	queueName := globalOpt.Global.QueueFormat + globalOpt.Global.ClientID
+	log.Debugf("Subscribing to %s", queueName)
 
-	sub, err := conn.Subscribe(globalOpt.Global.QueueFormat+clientID, stomp.AckAuto)
+	sub, err := conn.Subscribe(queueName, stomp.AckAuto)
 	if err != nil {
-		log.Errorf("Cannot subscribe to %s: %v", globalOpt.Global.QueueFormat+clientID, err.Error())
+		log.Errorf("Cannot subscribe to %s: %v", queueName, err.Error())
 		return
 	}
 	close(subscribed)
@@ -158,11 +168,11 @@ func recvMessages(subscribed chan bool) {
 		msg := <-sub.C
 		if msg == nil {
 			log.Warn("Got empty message; ignore")
-			return
+			continue
 		}
 
 		message := string(msg.Body)
-		if msgCount%20 == 0 {
+		if msgCount%globalOpt.Global.MessageDumpInterval == 0 {
 			log.Infof("Got message: %s", message)
 		}
 		msgCount++
