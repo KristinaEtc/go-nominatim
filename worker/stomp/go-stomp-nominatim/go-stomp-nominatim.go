@@ -15,6 +15,15 @@ import (
 
 var log = slf.WithContext("go-stomp-nominatim.go")
 
+var (
+	// These fields are populated by govvv
+	BuildDate  string
+	GitCommit  string
+	GitBranch  string
+	GitState   string
+	GitSummary string
+)
+
 /*-------------------------
 	Config option structures
 -------------------------*/
@@ -41,7 +50,7 @@ type NominatimConf struct {
 type ConfFile struct {
 	Global      GlobalConf
 	NominatimDB NominatimConf
-}D
+}
 
 var globalOpt = ConfFile{
 	Global: GlobalConf{
@@ -257,6 +266,13 @@ func main() {
 
 	subscribed := make(chan bool)
 	log.Error("----------------------------------------------")
+
+	log.Infof("BuildDate=%s\n", BuildDate)
+	log.Infof("GitCommit=%s\n", GitCommit)
+	log.Infof("GitBranch=%s\n", GitBranch)
+	log.Infof("GitState=%s\n", GitState)
+	log.Infof("GitSummary=%s\n", GitSummary)
+
 	log.Info("Starting working...")
 	go requestLoop(subscribed)
 
