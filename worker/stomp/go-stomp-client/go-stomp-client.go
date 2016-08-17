@@ -4,14 +4,13 @@ package main
 import (
 	"time"
 
+	"github.com/KristinaEtc/config"
 	"github.com/KristinaEtc/go-nominatim/lib/utils/fileproc"
 	"github.com/KristinaEtc/go-nominatim/lib/utils/request"
 	_ "github.com/KristinaEtc/slflog"
-
-	"github.com/KristinaEtc/config"
-	_ "github.com/KristinaEtc/slflog"
 	"github.com/go-stomp/stomp"
 	"github.com/ventu-io/slf"
+	"time"
 )
 
 //  u "github.com/KristinaEtc/utils"
@@ -49,6 +48,7 @@ type GlobalConf struct {
 	TestFile            string
 	ClientID            string
 	MessageDumpInterval int
+	Heartbeat           int
 }
 
 // ConfFile is a file with all program options
@@ -67,6 +67,7 @@ var globalOpt = ConfFile{
 		DestinQueue:         "/queue/nominatimRequest",
 		ClientID:            "clientID",
 		MessageDumpInterval: 20,
+		Heartbeat:           30,
 	},
 }
 
@@ -79,6 +80,23 @@ var (
 	stop = make(chan bool)
 )
 
+func Connect() (*stomp.Conn, error) {
+	heartbeat := time.Duration(globalOpt.Global.Heartbeat) * time.Second
+
+	options = []func(*stomp.Conn) error{
+		stomp.ConnOpt.Login(globalOpt.Global.ServerUser, globalOpt.Global.ServerPassword),
+		stomp.ConnOpt.Host(globalOpt.Global.ServerAddr),
+		stomp.ConnOpt.HeartBeat(heartbeat, heartbeat),
+	}
+
+	conn, err := stomp.Dial("tcp", globalOpt.Global.ServerAddr, options...)
+	if err != nil {
+		log.Errorf("cannot connect to server %v", err.Error())
+		return nil, err
+	}
+	return conn, nil
+}
+
 func sendMessages() {
 	defer func() {
 		stop <- true
@@ -89,20 +107,8 @@ func sendMessages() {
 		return
 	}
 
-	options = []func(*stomp.Conn) error{
-		stomp.ConnOpt.Login(globalOpt.Global.ServerUser, globalOpt.Global.ServerPassword),
-		stomp.ConnOpt.Host(globalOpt.Global.ServerAddr),
-	}
-
-	_, err := stomp.Dial("tcp", globalOpt.Global.ServerAddr, options...)
+	connSend, err := Connect()
 	if err != nil {
-		log.Errorf("cannot connect to server %v", err.Error())
-		return
-	}
-
-	connSend, err := stomp.Dial("tcp", globalOpt.Global.ServerAddr, options...)
-	if err != nil {
-		log.Errorf("cannot connect to server %v", err.Error())
 		return
 	}
 
@@ -147,14 +153,8 @@ func recvMessages(subscribed chan bool) {
 		stop <- true
 	}()
 
-	options = []func(*stomp.Conn) error{
-		stomp.ConnOpt.Login(globalOpt.Global.ServerUser, globalOpt.Global.ServerPassword),
-		stomp.ConnOpt.Host(globalOpt.Global.ServerAddr),
-	}
-
-	conn, err := stomp.Dial("tcp", globalOpt.Global.ServerAddr, options...)
+	conn, err := Connect()
 	if err != nil {
-		log.Errorf("Cannot connect to server: %v", err.Error())
 		return
 	}
 
