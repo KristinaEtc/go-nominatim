@@ -163,7 +163,7 @@ func recvMessages(subscribed chan bool) {
 
 		msg, err := sub.Read()
 		if err != nil {
-			log.Warn("Got empty message; ignore")
+			//log.Warn("Got empty message; ignore")
 			time.Sleep(time.Second)
 			continue
 
