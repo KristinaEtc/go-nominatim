@@ -160,16 +160,13 @@ func recvMessages(subscribed chan bool) {
 
 	var msgCount = 0
 	for {
-		//	msg := <-sub.C
+
 		msg, err := sub.Read()
 		if err != nil {
 			log.Warn("Got empty message; ignore")
-<<<<<<< Updated upstream
-			return
-=======
 			time.Sleep(time.Second)
 			continue
->>>>>>> Stashed changes
+
 		}
 
 		message := string(msg.Body)

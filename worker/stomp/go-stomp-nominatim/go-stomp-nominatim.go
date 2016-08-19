@@ -16,8 +16,6 @@ import (
 
 var log = slf.WithContext("go-stomp-nominatim.go")
 
-<<<<<<< Updated upstream
-=======
 var (
 	// These fields are populated by govvv
 	BuildDate  string
@@ -28,7 +26,6 @@ var (
 	Version    string
 )
 
->>>>>>> Stashed changes
 /*-------------------------
 	Config option structures
 -------------------------*/
@@ -55,7 +52,7 @@ type NominatimConf struct {
 type ConfFile struct {
 	Global      GlobalConf
 	NominatimDB NominatimConf
-}D
+}
 
 var globalOpt = ConfFile{
 	Global: GlobalConf{
@@ -273,8 +270,6 @@ func main() {
 
 	subscribed := make(chan bool)
 	log.Error("----------------------------------------------")
-<<<<<<< Updated upstream
-=======
 
 	log.Infof("BuildDate=%s\n", BuildDate)
 	log.Infof("GitCommit=%s\n", GitCommit)
@@ -283,7 +278,6 @@ func main() {
 	log.Infof("GitSummary=%s\n", GitSummary)
 	log.Infof("VERSION=%s\n", Version)
 
->>>>>>> Stashed changes
 	log.Info("Starting working...")
 	go requestLoop(subscribed)
 
