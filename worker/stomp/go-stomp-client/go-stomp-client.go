@@ -1,17 +1,20 @@
 package main
 
 //important: must execute first; do not move
-import _ "github.com/KristinaEtc/slflog"
-
 import (
+	"time"
+
 	"github.com/KristinaEtc/go-nominatim/lib/utils/fileproc"
 	"github.com/KristinaEtc/go-nominatim/lib/utils/request"
 	_ "github.com/KristinaEtc/slflog"
-	//	u "github.com/KristinaEtc/utils"
+
 	"github.com/KristinaEtc/config"
+	_ "github.com/KristinaEtc/slflog"
 	"github.com/go-stomp/stomp"
 	"github.com/ventu-io/slf"
 )
+
+//	u "github.com/KristinaEtc/utils"
 
 const (
 	defaultPort = ":61614"
@@ -119,10 +122,12 @@ func sendMessages() {
 
 		log.Debugf("reqInJSON: %s", *reqInJSON)
 
+		time.Sleep(time.Second)
+
 		err = connSend.Send(globalOpt.Global.DestinQueue, "text/json", []byte(*reqInJSON), nil...)
 		if err != nil {
 			log.Errorf("Failed to send to server: %v", err)
-			return
+			continue
 		}
 		i++
 	}
@@ -155,10 +160,16 @@ func recvMessages(subscribed chan bool) {
 
 	var msgCount = 0
 	for {
-		msg := <-sub.C
-		if msg == nil {
+		//	msg := <-sub.C
+		msg, err := sub.Read()
+		if err != nil {
 			log.Warn("Got empty message; ignore")
+<<<<<<< Updated upstream
 			return
+=======
+			time.Sleep(time.Second)
+			continue
+>>>>>>> Stashed changes
 		}
 
 		message := string(msg.Body)

@@ -1,20 +1,34 @@
 package main
 
 //important: must execute first; do not move
-import _ "github.com/KristinaEtc/slflog"
-
 import (
 	"encoding/json"
+	"time"
 
 	"github.com/KristinaEtc/config"
 	"github.com/KristinaEtc/go-nominatim/lib"
+	_ "github.com/KristinaEtc/slflog"
 	"github.com/go-stomp/stomp"
+
 	_ "github.com/lib/pq"
 	"github.com/ventu-io/slf"
 )
 
 var log = slf.WithContext("go-stomp-nominatim.go")
 
+<<<<<<< Updated upstream
+=======
+var (
+	// These fields are populated by govvv
+	BuildDate  string
+	GitCommit  string
+	GitBranch  string
+	GitState   string
+	GitSummary string
+	Version    string
+)
+
+>>>>>>> Stashed changes
 /*-------------------------
 	Config option structures
 -------------------------*/
@@ -218,10 +232,11 @@ func requestLoop(subscribed chan bool) {
 	close(subscribed)
 
 	for {
-		msg := <-sub.C
-		if msg == nil {
-			log.WithCaller(slf.CallerShort).Error("Got nil message")
-			return
+		msg, err := sub.Read()
+		if err != nil {
+			log.Errorf("error get from server %s", err.Error())
+			time.Sleep(time.Second * 2)
+			continue
 		}
 
 		reqJSON := msg.Body
@@ -241,7 +256,8 @@ func requestLoop(subscribed chan bool) {
 			[]byte(replyJSON), nil...)
 		if err != nil {
 			log.WithCaller(slf.CallerShort).Errorf("Failed to send to server %s", err)
-			return
+			time.Sleep(time.Second)
+			continue
 		}
 
 		log.Debug("Sending finished")
@@ -257,6 +273,17 @@ func main() {
 
 	subscribed := make(chan bool)
 	log.Error("----------------------------------------------")
+<<<<<<< Updated upstream
+=======
+
+	log.Infof("BuildDate=%s\n", BuildDate)
+	log.Infof("GitCommit=%s\n", GitCommit)
+	log.Infof("GitBranch=%s\n", GitBranch)
+	log.Infof("GitState=%s\n", GitState)
+	log.Infof("GitSummary=%s\n", GitSummary)
+	log.Infof("VERSION=%s\n", Version)
+
+>>>>>>> Stashed changes
 	log.Info("Starting working...")
 	go requestLoop(subscribed)
 
