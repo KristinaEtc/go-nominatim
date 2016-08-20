@@ -2,8 +2,6 @@ package main
 
 //important: must execute first; do not move
 import (
-	"time"
-
 	"github.com/KristinaEtc/config"
 	"github.com/KristinaEtc/go-nominatim/lib/utils/fileproc"
 	"github.com/KristinaEtc/go-nominatim/lib/utils/request"
