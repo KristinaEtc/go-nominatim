@@ -2,6 +2,7 @@ package request
 
 import (
 	"encoding/json"
+	"fmt"
 	"strconv"
 	"strings"
 )
@@ -29,6 +30,9 @@ func (r *Req) getLocationJSON() (string, error) {
 func MakeReq(parameters, clientID string, ID int) (reqInJSON *string, err error) {
 
 	locSlice := strings.Split(parameters, ",")
+	if len(locSlice) < 3 {
+		return nil, fmt.Errorf("invalid string %s", parameters)
+	}
 	r := Req{}
 	r.Lat, err = strconv.ParseFloat(locSlice[0], 32)
 

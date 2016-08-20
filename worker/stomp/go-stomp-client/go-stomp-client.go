@@ -129,7 +129,7 @@ func sendMessages() {
 		reqInJSON, err := request.MakeReq(locs, globalOpt.Global.ClientID, i)
 		//reqInJSON, err := request.MakeReq(locs, clientID, i, log)
 		if err != nil {
-			log.Error("Could not get coordinates in JSON: wrong format")
+			log.Errorf("Error parse request parameters \"%v\"", err)
 			continue
 		}
 
