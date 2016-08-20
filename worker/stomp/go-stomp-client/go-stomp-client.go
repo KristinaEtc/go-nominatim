@@ -124,7 +124,7 @@ func sendMessages() {
 		/*if fileNotFinished := fs.Scanner.Scan(); fileNotFinished == true {*/
 		locs := fs.Scanner.Text()
 
-		log.Debugf("locs: %s", locs)
+		log.Infof("File line: %s", locs)
 
 		reqInJSON, err := request.MakeReq(locs, globalOpt.Global.ClientID, i)
 		//reqInJSON, err := request.MakeReq(locs, clientID, i, log)
@@ -133,7 +133,7 @@ func sendMessages() {
 			continue
 		}
 
-		log.Debugf("reqInJSON: %s", *reqInJSON)
+		log.Infof("Request:: %s", *reqInJSON)
 
 		time.Sleep(time.Second)
 
