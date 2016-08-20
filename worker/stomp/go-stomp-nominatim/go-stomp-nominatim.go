@@ -143,7 +143,7 @@ func (p *Params) locationSearch(rawMsg []byte, geocode *Nominatim.ReverseGeocode
 
 	log.Debug("getLocationJSON done")
 
-	log.Infof("%s %d", p.clientReq.ClientID, p.clientReq.ID)
+	log.Debugf("Client:%s ID:%d", p.clientReq.ClientID, p.clientReq.ID)
 
 	return placeJSON, &whoToSent, nil
 
