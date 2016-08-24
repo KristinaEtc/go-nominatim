@@ -11,8 +11,11 @@ worker/stomp/go-stomp-client/go-stomp-client
 *.deb
 *.exe
 
-log
+loog
 go-deb
 
 .vscode
+
+worker/stomp/go-stomp-nominatim/go-stomp-nominatim_navi2.config
+worker/stomp/go-stomp-nominatim/logs
 
