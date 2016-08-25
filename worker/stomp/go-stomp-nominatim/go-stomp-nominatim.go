@@ -38,6 +38,8 @@ type GlobalConf struct {
 	ServerPassword string
 	QueueFormat    string
 	QueueName      string
+	QueuePriorName string
+	ResentFullReq  bool
 }
 
 // NominatimConf options
@@ -56,11 +58,13 @@ type ConfFile struct {
 
 var globalOpt = ConfFile{
 	Global: GlobalConf{
-		ServerAddr:     "localhost:61614",
+		ServerAddr:     "localhost:61615",
 		QueueFormat:    "/queue/",
 		QueueName:      "/queue/nominatimRequest",
+		QueuePriorName: "/queue/nominatimPriorRequest",
 		ServerUser:     "",
 		ServerPassword: "",
+		ResentFullReq:  true,
 	},
 	NominatimDB: NominatimConf{
 		DBname:   "nominatim",
@@ -94,6 +98,7 @@ type Params struct {
 	clientReq      Req
 	format         string
 	addressDetails bool
+	machineId      string
 	//sqlOpenStr     string
 	//config         NominatimConf
 	//db             *sql.DB
@@ -127,6 +132,19 @@ func (p *Params) locationSearch(rawMsg []byte, geocode *Nominatim.ReverseGeocode
 	log.Debug("addCoordinatesToStruct done")
 
 	whoToSent := p.clientReq.ClientID
+
+	if globalOpt.Global.ResentFullReq == true {
+
+		var msgMapTemplate interface{}
+		err := json.Unmarshal(rawMsg, &msgMapTemplate)
+		if err != nil {
+			log.Panic("err != nil")
+		}
+		//log.Warnf("%v\n", msgMapTemplate)
+		msgMap := msgMapTemplate.(map[string]interface{})
+		//log.Warnf("%v", msgMap)
+		geocode.SetFullReq(msgMap)
+	}
 
 	place, err := p.getLocationFromNominatim(geocode)
 	if err != nil {
@@ -166,7 +184,9 @@ func (p *Params) getLocationFromNominatim(reverseGeocode *Nominatim.ReverseGeoco
 	reverseGeocode.SetIncludeAddressDetails(p.addressDetails)
 	reverseGeocode.SetZoom(p.clientReq.Zoom)
 	reverseGeocode.SetLocation(p.clientReq.Lat, p.clientReq.Lon)
-	place, err := reverseGeocode.Lookup()
+	reverseGeocode.SetMachineID(p.machineId)
+
+	place, err := reverseGeocode.Lookup(globalOpt.Global.ResentFullReq)
 	if err != nil {
 		return nil, err
 	}
@@ -238,6 +258,7 @@ func requestLoop(subscribed chan bool) {
 
 		reqJSON := msg.Body
 		var p Params
+		p.machineId = connSend.GetConnInfo()
 		replyJSON, whoToSent, err := p.locationSearch(reqJSON, reverseGeocode)
 		if err != nil {
 			log.WithCaller(slf.CallerShort).Errorf("Error: locationSearch %s", err.Error())
@@ -248,6 +269,7 @@ func requestLoop(subscribed chan bool) {
 		}
 
 		log.Debugf("whoToSent %s", *whoToSent)
+		log.Debugf("i'm sending: %s\n", string(replyJSON[:]))
 
 		err = connSend.Send(globalOpt.Global.QueueFormat+*whoToSent, "text/plain",
 			[]byte(replyJSON), nil...)

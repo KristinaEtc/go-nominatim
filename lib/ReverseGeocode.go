@@ -2,6 +2,8 @@ package Nominatim
 
 import (
 	"database/sql"
+	"fmt"
+	"time"
 	//"fmt"
 	_ "github.com/lib/pq"
 	"github.com/ventu-io/slf"
@@ -16,6 +18,8 @@ type ReverseGeocode struct {
 	//aLangPreOrder
 	addressDetails bool
 	db             *sql.DB
+	machineID      string
+	fullReq        interface{}
 }
 
 type DataWithoutDetails struct {
@@ -26,6 +30,10 @@ type DataWithoutDetails struct {
 	Lon         string
 	Langaddress string
 	ID          int
+	dataProc    string
+	MachineID   string
+	TimeReq     string
+	FullReq     interface{}
 }
 
 func (d DataWithoutDetails) String() string {
@@ -34,17 +42,31 @@ func (d DataWithoutDetails) String() string {
 		"\nosm_type: " + d.Osm_type +
 		"\nlat: " + d.Lat +
 		"\nlon: " + d.Lon +
-		"\nlangaddress: " + d.Langaddress + "\n"
+		"\nlangaddress: " + d.Langaddress +
+		"\nmachineID: " + d.MachineID +
+		//	"\nfullReq: " + d.FullReq.(string) +
+		"\ntimeReq: " + d.TimeReq + "\n"
 	return str
 }
 
-func dataMapToStruct(m map[string]string) *DataWithoutDetails {
+func dataMapToStruct(m map[string]string, id string, resentFullReq bool, fullR interface{}) *DataWithoutDetails {
+
+	t := time.Now().Format("2006-01-02 15:04:05")
+
 	dataStr := DataWithoutDetails{Place_id: m["place_id"],
 		Osm_id:      m["osm_id"],
 		Osm_type:    m["osm_type"],
 		Lat:         m["lat"],
 		Lon:         m["lon"],
 		Langaddress: m["langaddress"],
+		MachineID:   id,
+		TimeReq:     fmt.Sprintf("%s", t),
+	}
+
+	//log.Debugf("resentbool=%v", resentFullReq)
+
+	if resentFullReq == true {
+		dataStr.FullReq = fullR
 	}
 	return &dataStr
 }
@@ -62,6 +84,14 @@ func NewReverseGeocode(sqlOpenStr string) (*ReverseGeocode, error) {
 
 func (r *ReverseGeocode) Close() {
 	r.db.Close()
+}
+
+func (r *ReverseGeocode) SetMachineID(id string) {
+	r.machineID = id
+}
+
+func (r *ReverseGeocode) SetFullReq(fr interface{}) {
+	r.fullReq = fr
 }
 
 func (r *ReverseGeocode) SetLocation(fLat, fLon float64) {
@@ -116,7 +146,8 @@ func (r *ReverseGeocode) SetZoom(iZoom int) {
 	}*/
 }
 
-func (r *ReverseGeocode) Lookup() (*DataWithoutDetails, error) {
+func (r *ReverseGeocode) Lookup(resentFullReq bool) (*DataWithoutDetails, error) {
+
 	//sLon := strconv.FormatFloat(r.fLon, 'f', 6, 64)
 	//sLat := strconv.FormatFloat(r.fLat, 'f', 6, 64)
 
@@ -224,7 +255,6 @@ func (r *ReverseGeocode) Lookup() (*DataWithoutDetails, error) {
 			if iNewPlaceID.Valid {
 				iPlaceID = iNewPlaceID
 			}
-
 		}
 	}
 
@@ -234,8 +264,9 @@ func (r *ReverseGeocode) Lookup() (*DataWithoutDetails, error) {
 		placeLookup.SetIncludeAddressDetails(r.addressDetails)
 		placeLookup.SetPlaceID(iPlaceID.Int64)
 		dataMap := placeLookup.Lookup()
-		return dataMapToStruct(dataMap), nil
-	} else {
-		return nil, errors.New("place not found")
+		return dataMapToStruct(dataMap, r.machineID, resentFullReq, r.fullReq), nil
 	}
+
+	return nil, errors.New("place not found")
+
 }

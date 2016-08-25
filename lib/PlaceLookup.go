@@ -8,12 +8,8 @@ import (
 	"github.com/ventu-io/slf"
 )
 
-var log slf.StructuredLogger
 var pwdCurr string = "KristinaEtc/Nominatim/lib/Nominatim"
-
-func init() {
-	log = slf.WithContext(pwdCurr)
-}
+var log = slf.WithContext(pwdCurr)
 
 type PlaceLookup struct {
 	maxRank int
