@@ -41,6 +41,7 @@ type DiagnosticsConf struct {
 	CoeffEMA  float64
 	TopicName string
 	TimeOut   int // in seconds
+	MachineID string
 }
 
 type ConnectionConf struct {
@@ -83,6 +84,7 @@ var globalOpt = ConfFile{
 		CoeffEMA:  0.5,
 		TopicName: "/queue/nominatimRequest",
 		TimeOut:   5,
+		MachineID: "defaultName",
 	},
 	NominatimDB: NominatimConf{
 		DBname:   "nominatim",
@@ -138,6 +140,8 @@ type monitoringData struct {
 	Reqs          int
 	Err           int
 	LastErr       string
+	MachineID     string
+	MachineAddr   string
 }
 
 //--------------------------------------------------------------------------
@@ -285,6 +289,8 @@ func requestLoop(subscribed chan bool, timeToMonitoring chan monitoringData) {
 		EMA:           0.0,
 		Err:           0,
 		LastErr:       "",
+		MachineAddr:   connSend.GetConnInfo(),
+		MachineID:     globalOpt.DiagnConf.MachineID,
 	}
 
 	go func() {
@@ -335,6 +341,7 @@ func requestLoop(subscribed chan bool, timeToMonitoring chan monitoringData) {
 		err = connSend.Send(globalOpt.ConnConf.QueueFormat+*whoToSent, "text/plain",
 			[]byte(replyJSON), nil...)
 		if err != nil {
+			data.MachineAddr = connSend.GetConnInfo()
 			data.Err++
 			log.WithCaller(slf.CallerShort).Errorf("Failed to send to server %s", err)
 			time.Sleep(time.Second)
