@@ -51,7 +51,7 @@ func (d DataWithoutDetails) String() string {
 
 func dataMapToStruct(m map[string]string, id string, resentFullReq bool, fullR interface{}) *DataWithoutDetails {
 
-	t := time.Now().Format("2006-01-02 15:04:05")
+	t := time.Now().Format("2006-01-02T15:04:05")
 
 	dataStr := DataWithoutDetails{Place_id: m["place_id"],
 		Osm_id:      m["osm_id"],
