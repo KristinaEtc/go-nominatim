@@ -3,6 +3,7 @@ package main
 //important: must execute first; do not move
 import (
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/KristinaEtc/config"
@@ -30,16 +31,23 @@ var (
   Config option structures
 -------------------------*/
 
-// GlobalConf is a struct with global options,
-// like server address and queue format, etc.
-type GlobalConf struct {
+type QueueOptConf struct {
+	QueueName      string
+	QueuePriorName string
+	ResentFullReq  bool
+}
+
+type DiagnosticsConf struct {
+	CoeffEMA  float64
+	TopicName string
+	TimeOut   int // in seconds
+}
+
+type ConnectionConf struct {
 	ServerAddr     string
 	ServerUser     string
 	ServerPassword string
 	QueueFormat    string
-	QueueName      string
-	QueuePriorName string
-	ResentFullReq  bool
 }
 
 // NominatimConf options
@@ -52,19 +60,29 @@ type NominatimConf struct {
 
 // ConfFile is a file with all program options
 type ConfFile struct {
-	Global      GlobalConf
+	ConnConf    ConnectionConf
+	DiagnConf   DiagnosticsConf
+	QueueConf   QueueOptConf
 	NominatimDB NominatimConf
 }
 
 var globalOpt = ConfFile{
-	Global: GlobalConf{
+
+	ConnConf: ConnectionConf{
 		ServerAddr:     "localhost:61615",
 		QueueFormat:    "/queue/",
-		QueueName:      "/queue/nominatimRequest",
-		QueuePriorName: "/queue/nominatimPriorRequest",
 		ServerUser:     "",
 		ServerPassword: "",
+	},
+	QueueConf: QueueOptConf{
 		ResentFullReq:  true,
+		QueueName:      "/queue/nominatimRequest",
+		QueuePriorName: "/queue/nominatimPriorRequest",
+	},
+	DiagnConf: DiagnosticsConf{
+		CoeffEMA:  0.5,
+		TopicName: "/queue/nominatimRequest",
+		TimeOut:   5,
 	},
 	NominatimDB: NominatimConf{
 		DBname:   "nominatim",
@@ -81,10 +99,10 @@ var globalOpt = ConfFile{
 
 var stop = make(chan bool)
 
-/*var options []func(*stomp.Conn) error = []func(*stomp.Conn) error{
-  stomp.ConnOpt.Login("guest", "guest"),
-  stomp.ConnOpt.Host("/"),
-}*/
+var options []func(*stomp.Conn) error = []func(*stomp.Conn) error{
+	stomp.ConnOpt.Login("", ""),
+	stomp.ConnOpt.Host("127.0.0.1"),
+}
 
 type Req struct {
 	Lat      float64
@@ -109,6 +127,21 @@ type ErrorResponse struct {
 	Message string
 }
 
+// monitoringData is a struct which will be sended to a spetial topic
+// for diagnostics
+type monitoringData struct {
+	LastReconnect string
+	EMA           float64 // exponential moving average
+	ConnTryings   int
+	ErrResp       int
+	SuccResp      int
+	Reqs          int
+	Err           int
+	LastErr       string
+}
+
+//--------------------------------------------------------------------------
+
 func createErrResponse(err error) []byte {
 	respJSON := ErrorResponse{Type: "error", Message: err.Error()}
 
@@ -120,20 +153,20 @@ func createErrResponse(err error) []byte {
 	return bytes
 }
 
-func (p *Params) locationSearch(rawMsg []byte, geocode *Nominatim.ReverseGeocode) ([]byte, *string, error) {
+func (p *Params) locationSearch(rawMsg []byte, geocode *Nominatim.ReverseGeocode) ([]byte, *string, bool, error) {
 
 	log.Debugf("Got request: %s", rawMsg)
 
 	err := p.addCoordinatesToStruct(rawMsg)
 	if err != nil {
 		log.WithCaller(slf.CallerShort).Error(err.Error())
-		return nil, nil, err
+		return nil, nil, false, err
 	}
 	log.Debug("addCoordinatesToStruct done")
 
 	whoToSent := p.clientReq.ClientID
 
-	if globalOpt.Global.ResentFullReq == true {
+	if globalOpt.QueueConf.ResentFullReq == true {
 
 		var msgMapTemplate interface{}
 		err := json.Unmarshal(rawMsg, &msgMapTemplate)
@@ -149,21 +182,21 @@ func (p *Params) locationSearch(rawMsg []byte, geocode *Nominatim.ReverseGeocode
 	place, err := p.getLocationFromNominatim(geocode)
 	if err != nil {
 		log.WithCaller(slf.CallerShort).Error(err.Error())
-		return createErrResponse(err), &whoToSent, nil
+		return createErrResponse(err), &whoToSent, true, nil
 	}
 
 	log.Debug("getLocationFromNominatim done")
 	placeJSON, err := getLocationJSON(*place)
 	if err != nil {
 		log.WithCaller(slf.CallerShort).Error(err.Error())
-		return createErrResponse(err), &whoToSent, nil
+		return createErrResponse(err), &whoToSent, true, nil
 	}
 
 	log.Debug("getLocationJSON done")
 
 	log.Debugf("Client:%s ID:%d", p.clientReq.ClientID, p.clientReq.ID)
 
-	return placeJSON, &whoToSent, nil
+	return placeJSON, &whoToSent, false, nil
 
 }
 
@@ -186,7 +219,7 @@ func (p *Params) getLocationFromNominatim(reverseGeocode *Nominatim.ReverseGeoco
 	reverseGeocode.SetLocation(p.clientReq.Lat, p.clientReq.Lon)
 	reverseGeocode.SetMachineID(p.machineId)
 
-	place, err := reverseGeocode.Lookup(globalOpt.Global.ResentFullReq)
+	place, err := reverseGeocode.Lookup(globalOpt.QueueConf.ResentFullReq)
 	if err != nil {
 		return nil, err
 	}
@@ -205,7 +238,7 @@ func getLocationJSON(data Nominatim.DataWithoutDetails) ([]byte, error) {
 	return dataJSON, nil
 }
 
-func requestLoop(subscribed chan bool) {
+func requestLoop(subscribed chan bool, timeToMonitoring chan monitoringData) {
 	defer func() {
 		stop <- true
 	}()
@@ -223,63 +256,134 @@ func requestLoop(subscribed chan bool) {
 	}
 	defer reverseGeocode.Close()
 
-	var options = []func(*stomp.Conn) error{
-		stomp.ConnOpt.Login(globalOpt.Global.ServerUser, globalOpt.Global.ServerPassword),
-		stomp.ConnOpt.Host(globalOpt.Global.ServerAddr),
-	}
-
-	connSubsc, err := stomp.Dial("tcp", globalOpt.Global.ServerAddr, options...)
+	connSubsc, err := stomp.Dial("tcp", globalOpt.ConnConf.ServerAddr, options...)
 	if err != nil {
 		log.WithCaller(slf.CallerShort).Errorf("cannot connect to server (connSubsc): %s", err.Error())
 		return
 	}
 
-	connSend, err := stomp.Dial("tcp", globalOpt.Global.ServerAddr, options...)
+	connSend, err := stomp.Dial("tcp", globalOpt.ConnConf.ServerAddr, options...)
 	if err != nil {
 		log.WithCaller(slf.CallerShort).Errorf("cannot connect to server (connSend): %s", err.Error())
 		return
 	}
 
-	sub, err := connSubsc.Subscribe(globalOpt.Global.QueueName, stomp.AckAuto)
+	sub, err := connSubsc.Subscribe(globalOpt.QueueConf.QueueName, stomp.AckAuto)
 	if err != nil {
 		log.WithCaller(slf.CallerShort).Errorf("cannot subscribe to %s: %s",
-			globalOpt.Global.QueueName, err.Error())
+			globalOpt.QueueConf.QueueName, err.Error())
 		return
 	}
 	close(subscribed)
 
+	timeStr := fmt.Sprintf("%s", time.Now().Format("2006-01-02 15:04:05"))
+	var data = monitoringData{
+		LastReconnect: timeStr,
+		ConnTryings:   0,
+		ErrResp:       0,
+		SuccResp:      0,
+		EMA:           0.0,
+		Err:           0,
+		LastErr:       "",
+	}
+
+	go func() {
+		for {
+			time.Sleep(time.Duration(globalOpt.DiagnConf.TimeOut) * time.Second)
+			log.Info("go func timeout")
+			timeToMonitoring <- data
+		}
+	}()
+
 	for {
 		msg, err := sub.Read()
+		start := time.Now()
+		data.Reqs++
+
 		if err != nil {
 			log.Errorf("error get from server %s", err.Error())
-			time.Sleep(time.Second * 2)
+			data.ConnTryings++
+			data.LastErr = err.Error()
 			continue
 		}
 
 		reqJSON := msg.Body
 		var p Params
 		p.machineId = connSend.GetConnInfo()
-		replyJSON, whoToSent, err := p.locationSearch(reqJSON, reverseGeocode)
+		replyJSON, whoToSent, errResp, err := p.locationSearch(reqJSON, reverseGeocode)
 		if err != nil {
 			log.WithCaller(slf.CallerShort).Errorf("Error: locationSearch %s", err.Error())
+			data.Err++
+			data.LastErr = err.Error()
 			continue
+		}
+		if errResp == true {
+			data.ErrResp++
+		} else {
+			data.SuccResp++
 		}
 		if replyJSON == nil {
+			log.Warn("MUST NOT ENTERED")
+			data.Err++
+			data.LastErr = "replyJSON == nil"
 			continue
 		}
 
-		log.Debugf("whoToSent %s", *whoToSent)
+		//log.Debugf("whoToSent %s", *whoToSent)
 		log.Debugf("i'm sending: %s\n", string(replyJSON[:]))
 
-		err = connSend.Send(globalOpt.Global.QueueFormat+*whoToSent, "text/plain",
+		err = connSend.Send(globalOpt.ConnConf.QueueFormat+*whoToSent, "text/plain",
 			[]byte(replyJSON), nil...)
 		if err != nil {
+			data.Err++
 			log.WithCaller(slf.CallerShort).Errorf("Failed to send to server %s", err)
 			time.Sleep(time.Second)
+			data.LastErr = err.Error()
 			continue
 		}
 
+		elapsed := float64(time.Since(start)) / 1000.0 / 1000.0 / 1000.0
+		//data.EMA = (data.EMA + elapsed) / 2
+		data.EMA = (1-globalOpt.DiagnConf.CoeffEMA)*data.EMA + globalOpt.DiagnConf.CoeffEMA*elapsed
 		log.Debug("Sending finished")
+	}
+}
+
+func sendStatus(timeToMonitoring chan monitoringData) {
+
+	defer func() {
+		stop <- true
+	}()
+
+	connSend, err := stomp.Dial("tcp", globalOpt.ConnConf.ServerAddr, options...)
+	if err != nil {
+		log.Errorf("cannot connect to server %s", err.Error())
+		return
+	}
+	for {
+		select {
+		case data := <-timeToMonitoring:
+
+			b, err := json.Marshal(data)
+			if err != nil {
+				log.Error(err.Error())
+				continue
+			}
+
+			err = connSend.Send(globalOpt.DiagnConf.TopicName, "text/json", b, nil...)
+			if err != nil {
+				log.Errorf("Error %s", err.Error())
+				continue
+			}
+
+		}
+	}
+}
+
+func initOptions() {
+	options = []func(*stomp.Conn) error{
+		stomp.ConnOpt.Login(globalOpt.ConnConf.ServerUser, globalOpt.ConnConf.ServerPassword),
+		stomp.ConnOpt.Host(globalOpt.ConnConf.ServerAddr),
 	}
 }
 
@@ -289,8 +393,11 @@ func main() {
 
 	//params := Params{}
 	config.ReadGlobalConfig(&globalOpt, "go-stomp-nominatim options")
+	initOptions()
 
 	subscribed := make(chan bool)
+	timeout := make(chan monitoringData)
+
 	log.Error("----------------------------------------------")
 
 	log.Infof("BuildDate=%s\n", BuildDate)
@@ -301,7 +408,11 @@ func main() {
 	log.Infof("VERSION=%s\n", Version)
 
 	log.Info("Starting working...")
-	go requestLoop(subscribed)
+	go requestLoop(subscribed, timeout)
+	<-subscribed
 
+	go sendStatus(timeout)
+
+	<-stop
 	<-stop
 }
