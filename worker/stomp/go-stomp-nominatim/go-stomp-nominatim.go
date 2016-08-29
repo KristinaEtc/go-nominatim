@@ -278,6 +278,14 @@ func requestLoop(subscribed chan bool, timeToMonitoring chan monitoringData) {
 			globalOpt.QueueConf.QueueName, err.Error())
 		return
 	}
+
+	subPrior, err := connSubsc.Subscribe(globalOpt.QueueConf.QueuePriorName, stomp.AckAuto)
+	if err != nil {
+		log.WithCaller(slf.CallerShort).Errorf("cannot subscribe to %s: %s",
+			globalOpt.QueueConf.QueueName, err.Error())
+		return
+	}
+
 	close(subscribed)
 
 	timeStr := fmt.Sprintf("%s", time.Now().Format("2006-01-02 15:04:05"))
@@ -301,17 +309,47 @@ func requestLoop(subscribed chan bool, timeToMonitoring chan monitoringData) {
 		}
 	}()
 
-	for {
-		msg, err := sub.Read()
-		start := time.Now()
-		data.Reqs++
+	var ok bool
+	var msg *stomp.Message
+	//	var queque string
 
-		if err != nil {
-			log.Errorf("error get from server %s", err.Error())
+	for {
+
+		select {
+		case msg, ok = <-subPrior.C:
+			//log.Info("got prior")
+			//queque = globalOpt.QueueConf.QueuePriorName
+			break
+		default:
+			select {
+			case msg, ok = <-sub.C:
+				//	queque = globalOpt.QueueConf.QueueName
+				//log.Info("got usual")
+				break
+			default:
+				continue
+			}
+		}
+
+		start := time.Now()
+
+		if !ok {
+			log.Warn("!ok")
 			data.ConnTryings++
-			data.LastErr = err.Error()
+			data.LastErr = "msg, ok = <-sub.C; !ok"
 			continue
 		}
+
+		/*	msg, err := sub.Read()
+			start := time.Now()
+			data.Reqs++
+
+			if err != nil {
+				log.Errorf("error get from server %s", err.Error())
+				data.ConnTryings++
+				data.LastErr = err.Error()
+				continue
+			}*/
 
 		reqJSON := msg.Body
 		var p Params
@@ -336,7 +374,8 @@ func requestLoop(subscribed chan bool, timeToMonitoring chan monitoringData) {
 		}
 
 		//log.Debugf("whoToSent %s", *whoToSent)
-		log.Debugf("i'm sending: %s\n", string(replyJSON[:]))
+		//log.Debugf("i'm sending: %s\n", string(replyJSON[:]))
+		log.Debugf("i'm sending to %s\n", globalOpt.ConnConf.QueueFormat+*whoToSent)
 
 		err = connSend.Send(globalOpt.ConnConf.QueueFormat+*whoToSent, "text/plain",
 			[]byte(replyJSON), nil...)

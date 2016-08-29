@@ -2,13 +2,14 @@ package main
 
 //important: must execute first; do not move
 import (
+	"time"
+
 	"github.com/KristinaEtc/config"
 	"github.com/KristinaEtc/go-nominatim/lib/utils/fileproc"
 	"github.com/KristinaEtc/go-nominatim/lib/utils/request"
 	_ "github.com/KristinaEtc/slflog"
 	"github.com/go-stomp/stomp"
 	"github.com/ventu-io/slf"
-	"time"
 )
 
 //  u "github.com/KristinaEtc/utils"
@@ -42,7 +43,6 @@ type GlobalConf struct {
 	ServerPassword      string
 	QueueFormat         string
 	QueueName           string
-	DestinQueue         string
 	TestFile            string
 	ClientID            string
 	MessageDumpInterval int
@@ -62,7 +62,6 @@ var globalOpt = ConfFile{
 		ServerUser:          "",
 		ServerPassword:      "",
 		TestFile:            "test.csv",
-		DestinQueue:         "/queue/nominatimRequest",
 		ClientID:            "clientID",
 		MessageDumpInterval: 20,
 		Heartbeat:           30,
@@ -124,7 +123,7 @@ func sendMessages() {
 		/*if fileNotFinished := fs.Scanner.Scan(); fileNotFinished == true {*/
 		locs := fs.Scanner.Text()
 
-		log.Infof("File line: %s", locs)
+		//log.Infof("File line: %s", locs)
 
 		reqInJSON, err := request.MakeReq(locs, globalOpt.Global.ClientID, i)
 		//reqInJSON, err := request.MakeReq(locs, clientID, i, log)
@@ -133,11 +132,9 @@ func sendMessages() {
 			continue
 		}
 
-		log.Infof("Request:: %s", *reqInJSON)
+		//log.Infof("Request: %s", *reqInJSON)
 
-		time.Sleep(time.Second)
-
-		err = connSend.Send(globalOpt.Global.DestinQueue, "text/json", []byte(*reqInJSON), nil...)
+		err = connSend.Send(globalOpt.Global.QueueName, "text/json", []byte(*reqInJSON), nil...)
 		if err != nil {
 			log.Errorf("Failed to send to server: %v", err)
 			continue
@@ -175,11 +172,12 @@ func recvMessages(subscribed chan bool) {
 			time.Sleep(time.Second)
 			continue
 		}
-
+		time.Sleep(time.Second)
 		message := string(msg.Body)
-		if msgCount%globalOpt.Global.MessageDumpInterval == 0 {
-			log.Infof("Got message: %s", message)
-		}
+		//if msgCount%globalOpt.Global.MessageDumpInterval == 0 {
+		log.Infof("Got message: %s", message)
+		time.Sleep(time.Second)
+		//}
 		msgCount++
 	}
 }
