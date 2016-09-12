@@ -161,14 +161,13 @@ func createErrResponse(err error) []byte {
 
 func (p *Params) locationSearch(rawMsg []byte, geocode *Nominatim.ReverseGeocode) ([]byte, *string, bool, error) {
 
-	log.Debugf("Got request: %s", rawMsg)
+	log.Debugf("Request: %s", rawMsg)
 
 	err := p.addCoordinatesToStruct(rawMsg)
 	if err != nil {
 		log.WithCaller(slf.CallerShort).Error(err.Error())
 		return nil, nil, false, err
 	}
-	log.Debug("addCoordinatesToStruct done")
 
 	whoToSent := p.clientReq.ClientID
 
@@ -188,16 +187,13 @@ func (p *Params) locationSearch(rawMsg []byte, geocode *Nominatim.ReverseGeocode
 		return createErrResponse(err), &whoToSent, true, nil
 	}
 
-	log.Debug("getLocationFromNominatim done")
 	placeJSON, err := getLocationJSON(*place)
 	if err != nil {
 		log.WithCaller(slf.CallerShort).Error(err.Error())
 		return createErrResponse(err), &whoToSent, true, nil
 	}
 
-	log.Debug("getLocationJSON done")
-
-	log.Debugf("Client:%s ID:%d", p.clientReq.ClientID, p.clientReq.ID)
+	log.Debugf("Client:%s ID:%d placeJSON:%s", p.clientReq.ClientID, p.clientReq.ID, string(placeJSON))
 
 	return placeJSON, &whoToSent, false, nil
 
@@ -362,10 +358,6 @@ func requestLoop(subscribed chan bool, timeToMonitoring chan []byte) {
 			continue
 		}
 
-		//log.Debugf("whoToSent %s", *whoToSent)
-		//log.Debugf("i'm sending: %s\n", string(replyJSON[:]))
-		log.Debugf("i'm sending to %s\n", globalOpt.ConnConf.QueueFormat+*whoToSent)
-
 		err = connSend.Send(globalOpt.ConnConf.QueueFormat+*whoToSent, "text/plain",
 			[]byte(replyJSON), nil...)
 		if err != nil {
@@ -380,7 +372,6 @@ func requestLoop(subscribed chan bool, timeToMonitoring chan []byte) {
 		elapsed := float64(time.Since(start)) / 1000.0 / 1000.0
 		//data.EMA = (data.EMA + elapsed) / 2
 		data.AverageRate = (1-globalOpt.DiagnConf.CoeffEMA)*data.AverageRate + globalOpt.DiagnConf.CoeffEMA*elapsed
-		log.Debug("Sending finished")
 	}
 }
 
