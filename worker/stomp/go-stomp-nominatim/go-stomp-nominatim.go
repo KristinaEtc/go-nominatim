@@ -240,7 +240,7 @@ func getLocationJSON(data Nominatim.DataWithoutDetails) ([]byte, error) {
 	return dataJSON, nil
 }
 
-func requestLoop(subscribed chan bool, timeToMonitoring chan monitoringData) {
+func requestLoop(subscribed chan bool, timeToMonitoring chan []byte) {
 	defer func() {
 		stop <- true
 	}()
@@ -299,7 +299,7 @@ func requestLoop(subscribed chan bool, timeToMonitoring chan monitoringData) {
 		MachineID:     globalOpt.DiagnConf.MachineID,
 	}
 
-	timer := time.NewTimer(time.Duration(globalOpt.DiagnConf.TimeOut) * time.Second)
+	ticker := time.NewTicker(time.Duration(globalOpt.DiagnConf.TimeOut) * time.Second)
 
 	var ok bool
 	var msg *stomp.Message
@@ -312,8 +312,13 @@ func requestLoop(subscribed chan bool, timeToMonitoring chan monitoringData) {
 			//log.Info("got prior")
 			//queque = globalOpt.QueueConf.QueuePriorName
 			break
-		case <-timer.C:
-			timeToMonitoring <- data
+		case <-ticker.C:
+			b, err := json.Marshal(data)
+			if err != nil {
+				log.Error(err.Error())
+				continue
+			}
+			timeToMonitoring <- b
 		default:
 			select {
 			case msg, ok = <-sub.C:
@@ -378,7 +383,7 @@ func requestLoop(subscribed chan bool, timeToMonitoring chan monitoringData) {
 	}
 }
 
-func sendStatus(timeToMonitoring chan monitoringData) {
+func sendStatus(timeToMonitoring chan []byte) {
 
 	defer func() {
 		stop <- true
@@ -392,14 +397,8 @@ func sendStatus(timeToMonitoring chan monitoringData) {
 	for {
 		select {
 		case data := <-timeToMonitoring:
-			//V TIMERE
-			b, err := json.Marshal(data)
-			if err != nil {
-				log.Error(err.Error())
-				continue
-			}
 
-			err = connSend.Send(globalOpt.DiagnConf.TopicName, "text/json", b, nil...)
+			err = connSend.Send(globalOpt.DiagnConf.TopicName, "text/json", data, nil...)
 			if err != nil {
 				log.Errorf("Error %s", err.Error())
 				continue
@@ -425,7 +424,7 @@ func main() {
 	initOptions()
 
 	subscribed := make(chan bool)
-	timeout := make(chan monitoringData)
+	timeout := make(chan []byte)
 
 	log.Error("----------------------------------------------")
 
