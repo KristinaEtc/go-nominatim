@@ -29,7 +29,7 @@ type DataWithoutDetails struct {
 	Lat         string
 	Lon         string
 	Langaddress string
-	ID          int
+	ID          interface{}
 	dataProc    string
 	MachineID   string
 	TimeReq     string

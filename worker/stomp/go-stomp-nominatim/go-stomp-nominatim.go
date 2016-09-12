@@ -111,7 +111,7 @@ type Req struct {
 	Lon      float64
 	Zoom     int
 	ClientID string
-	ID       int
+	ID       interface{}
 }
 
 type Params struct {
@@ -224,6 +224,7 @@ func (p *Params) getLocationFromNominatim(reverseGeocode *Nominatim.ReverseGeoco
 	if err != nil {
 		return nil, err
 	}
+
 	place.ID = p.clientReq.ID
 
 	return place, nil
@@ -285,6 +286,7 @@ func requestLoop(subscribed chan bool, timeToMonitoring chan monitoringData) {
 
 	close(subscribed)
 
+	//ASLDFKGADJ;FLSKDJFG;
 	timeStr := fmt.Sprintf("%s", time.Now().Format("2006-01-02 15:04:05"))
 	var data = monitoringData{
 		LastReconnect: timeStr,
@@ -298,6 +300,7 @@ func requestLoop(subscribed chan bool, timeToMonitoring chan monitoringData) {
 		MachineID:     globalOpt.DiagnConf.MachineID,
 	}
 
+	//SDFGSDGFSDGFSDFG
 	go func() {
 		for {
 			time.Sleep(time.Duration(globalOpt.DiagnConf.TimeOut) * time.Second)
@@ -406,7 +409,7 @@ func sendStatus(timeToMonitoring chan monitoringData) {
 	for {
 		select {
 		case data := <-timeToMonitoring:
-
+			//V TIMERE
 			b, err := json.Marshal(data)
 			if err != nil {
 				log.Error(err.Error())
