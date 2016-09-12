@@ -82,7 +82,7 @@ var globalOpt = ConfFile{
 	},
 	DiagnConf: DiagnosticsConf{
 		CoeffEMA:  0.5,
-		TopicName: "/queue/nominatimRequest",
+		TopicName: "/topic/worker.status",
 		TimeOut:   5,
 		MachineID: "defaultName",
 	},
