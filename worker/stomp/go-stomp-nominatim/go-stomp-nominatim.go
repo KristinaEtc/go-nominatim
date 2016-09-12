@@ -177,10 +177,7 @@ func (p *Params) locationSearch(rawMsg []byte, geocode *Nominatim.ReverseGeocode
 		if err != nil {
 			log.Panic("err != nil")
 		}
-		//log.Warnf("%v\n", msgMapTemplate)
-		msgMap := msgMapTemplate.(map[string]interface{})
-		//log.Warnf("%v", msgMap)
-		geocode.SetFullReq(msgMap)
+		geocode.SetFullReq(msgMapTemplate)
 	}
 
 	place, err := p.getLocationFromNominatim(geocode)
