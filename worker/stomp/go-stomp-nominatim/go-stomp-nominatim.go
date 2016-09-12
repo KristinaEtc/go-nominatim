@@ -299,14 +299,7 @@ func requestLoop(subscribed chan bool, timeToMonitoring chan monitoringData) {
 		MachineID:     globalOpt.DiagnConf.MachineID,
 	}
 
-	//SDFGSDGFSDGFSDFG
-	go func() {
-		for {
-			time.Sleep(time.Duration(globalOpt.DiagnConf.TimeOut) * time.Second)
-			log.Info("go func timeout")
-			timeToMonitoring <- data
-		}
-	}()
+	timer := time.NewTimer(time.Duration(globalOpt.DiagnConf.TimeOut) * time.Second)
 
 	var ok bool
 	var msg *stomp.Message
@@ -319,6 +312,8 @@ func requestLoop(subscribed chan bool, timeToMonitoring chan monitoringData) {
 			//log.Info("got prior")
 			//queque = globalOpt.QueueConf.QueuePriorName
 			break
+		case <-timer.C:
+			timeToMonitoring <- data
 		default:
 			select {
 			case msg, ok = <-sub.C:
@@ -338,17 +333,6 @@ func requestLoop(subscribed chan bool, timeToMonitoring chan monitoringData) {
 			data.LastErr = "msg, ok = <-sub.C; !ok"
 			continue
 		}
-
-		/*	msg, err := sub.Read()
-			start := time.Now()
-			data.Reqs++
-
-			if err != nil {
-				log.Errorf("error get from server %s", err.Error())
-				data.ConnTryings++
-				data.LastErr = err.Error()
-				continue
-			}*/
 
 		reqJSON := msg.Body
 		var p Params
