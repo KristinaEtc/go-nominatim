@@ -371,7 +371,7 @@ func requestLoop(subscribed chan bool, timeToMonitoring chan monitoringData) {
 			continue
 		}
 
-		elapsed := float64(time.Since(start)) / 1000.0 / 1000.0 / 1000.0
+		elapsed := float64(time.Since(start)) / 1000.0 / 1000.0
 		//data.EMA = (data.EMA + elapsed) / 2
 		data.EMA = (1-globalOpt.DiagnConf.CoeffEMA)*data.EMA + globalOpt.DiagnConf.CoeffEMA*elapsed
 		log.Debug("Sending finished")
