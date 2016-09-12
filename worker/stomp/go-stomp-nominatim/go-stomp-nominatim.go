@@ -286,8 +286,7 @@ func requestLoop(subscribed chan bool, timeToMonitoring chan monitoringData) {
 
 	close(subscribed)
 
-	//ASLDFKGADJ;FLSKDJFG;
-	timeStr := fmt.Sprintf("%s", time.Now().Format("2006-01-02 15:04:05"))
+	timeStr := fmt.Sprintf("%s", time.Now().Format(time.RFC3339))
 	var data = monitoringData{
 		LastReconnect: timeStr,
 		ConnTryings:   0,
