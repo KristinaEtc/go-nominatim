@@ -81,7 +81,7 @@ var globalOpt = ConfFile{
 		QueuePriorName: "/queue/nominatimPriorRequest",
 	},
 	DiagnConf: DiagnosticsConf{
-		CoeffEMA:  0.5,
+		CoeffEMA:  0.1,
 		TopicName: "/topic/worker.status",
 		TimeOut:   5,
 		MachineID: "defaultName",
@@ -132,16 +132,18 @@ type ErrorResponse struct {
 // monitoringData is a struct which will be sended to a spetial topic
 // for diagnostics
 type monitoringData struct {
-	LastReconnect string
-	EMA           float64 // exponential moving average
-	ConnTryings   int
-	ErrResp       int
-	SuccResp      int
-	Reqs          int
-	Err           int
-	LastErr       string
-	MachineID     string
-	MachineAddr   string
+	StartTime      string
+	CurrentTime    string
+	LastReconnect  string
+	AverageRate    float64 // exponential moving average
+	ReconnectCount int
+	ErrResp        int
+	SuccResp       int
+	Reqs           int
+	ErrorCount     int
+	LastError      string
+	MachineID      string
+	MachineAddr    string
 }
 
 //--------------------------------------------------------------------------
@@ -288,15 +290,16 @@ func requestLoop(subscribed chan bool, timeToMonitoring chan []byte) {
 
 	timeStr := fmt.Sprintf("%s", time.Now().Format(time.RFC3339))
 	var data = monitoringData{
-		LastReconnect: timeStr,
-		ConnTryings:   0,
-		ErrResp:       0,
-		SuccResp:      0,
-		EMA:           0.0,
-		Err:           0,
-		LastErr:       "",
-		MachineAddr:   connSend.GetConnInfo(),
-		MachineID:     globalOpt.DiagnConf.MachineID,
+		StartTime:      string(time.Now().Format(time.RFC3339)),
+		LastReconnect:  timeStr,
+		ReconnectCount: 0,
+		ErrResp:        0,
+		SuccResp:       0,
+		AverageRate:    0.0,
+		ErrorCount:     0,
+		LastError:      "",
+		MachineAddr:    connSend.GetConnInfo(),
+		MachineID:      globalOpt.DiagnConf.MachineID,
 	}
 
 	ticker := time.NewTicker(time.Duration(globalOpt.DiagnConf.TimeOut) * time.Second)
@@ -306,24 +309,22 @@ func requestLoop(subscribed chan bool, timeToMonitoring chan []byte) {
 	//	var queque string
 
 	for {
-
+		ok = false
 		select {
 		case msg, ok = <-subPrior.C:
-			//log.Info("got prior")
-			//queque = globalOpt.QueueConf.QueuePriorName
 			break
 		case <-ticker.C:
+			data.CurrentTime = time.Now().Format(time.RFC3339)
 			b, err := json.Marshal(data)
 			if err != nil {
 				log.Error(err.Error())
 				continue
 			}
 			timeToMonitoring <- b
+			continue
 		default:
 			select {
 			case msg, ok = <-sub.C:
-				//	queque = globalOpt.QueueConf.QueueName
-				//log.Info("got usual")
 				break
 			default:
 				continue
@@ -334,8 +335,8 @@ func requestLoop(subscribed chan bool, timeToMonitoring chan []byte) {
 
 		if !ok {
 			log.Warn("!ok")
-			data.ConnTryings++
-			data.LastErr = "msg, ok = <-sub.C; !ok"
+			data.ReconnectCount++
+			data.LastError = "Reconnect"
 			continue
 		}
 
@@ -345,8 +346,8 @@ func requestLoop(subscribed chan bool, timeToMonitoring chan []byte) {
 		replyJSON, whoToSent, errResp, err := p.locationSearch(reqJSON, reverseGeocode)
 		if err != nil {
 			log.WithCaller(slf.CallerShort).Errorf("Error: locationSearch %s", err.Error())
-			data.Err++
-			data.LastErr = err.Error()
+			data.ErrorCount++
+			data.LastError = err.Error()
 			continue
 		}
 		if errResp == true {
@@ -356,8 +357,8 @@ func requestLoop(subscribed chan bool, timeToMonitoring chan []byte) {
 		}
 		if replyJSON == nil {
 			log.Warn("MUST NOT ENTERED")
-			data.Err++
-			data.LastErr = "replyJSON == nil"
+			data.ErrorCount++
+			data.LastError = "replyJSON == nil"
 			continue
 		}
 
@@ -369,16 +370,16 @@ func requestLoop(subscribed chan bool, timeToMonitoring chan []byte) {
 			[]byte(replyJSON), nil...)
 		if err != nil {
 			data.MachineAddr = connSend.GetConnInfo()
-			data.Err++
+			data.ErrorCount++
 			log.WithCaller(slf.CallerShort).Errorf("Failed to send to server %s", err)
 			time.Sleep(time.Second)
-			data.LastErr = err.Error()
+			data.LastError = err.Error()
 			continue
 		}
 
 		elapsed := float64(time.Since(start)) / 1000.0 / 1000.0
 		//data.EMA = (data.EMA + elapsed) / 2
-		data.EMA = (1-globalOpt.DiagnConf.CoeffEMA)*data.EMA + globalOpt.DiagnConf.CoeffEMA*elapsed
+		data.AverageRate = (1-globalOpt.DiagnConf.CoeffEMA)*data.AverageRate + globalOpt.DiagnConf.CoeffEMA*elapsed
 		log.Debug("Sending finished")
 	}
 }
