@@ -11,11 +11,11 @@ worker/stomp/go-stomp-client/go-stomp-client
 *.deb
 *.exe
 
-loog
-go-deb
-
 .vscode
 
 worker/stomp/go-stomp-nominatim/go-stomp-nominatim_navi2.config
 worker/stomp/go-stomp-nominatim/logs
 
+worker/stomp/go-elastic-monitoring/logs
+worker/stomp/go-elastic-monitoring/go-elastic-monitoring
+worker/stomp/go-elastic-monitoring/go-elastic-monitoring.config

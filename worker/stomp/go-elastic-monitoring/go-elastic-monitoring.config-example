@@ -1,0 +1,31 @@
+{
+  "Logs": {
+    "Handlers": [
+      {"Type": "stderr", 
+       "Level": "DEBUG"
+      },
+      {"Type": "file", 
+       "Level": "INFO",
+       "Filename": "info.log"
+      },
+      {"Type": "file", 
+       "Level": "ERROR",
+       "Filename": "error.log"
+      },
+      {"Type": "file", 
+       "Level": "DEBUG",
+       "Filename": "debug.log"
+      }
+    ],
+    "CallerInfo": true,
+    "Logpath": "logs"
+  },
+  "Subscriptions": [
+      {"Host": "localhos:61614",
+      "Login": "guest",
+      "Passcode": "guest",
+      "Queue": "/topic/test.status",
+      "Index": "test.status"
+      }
+    ]
+}
