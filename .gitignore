@@ -19,3 +19,6 @@ worker/stomp/go-stomp-nominatim/logs
 worker/stomp/go-elastic-monitoring/logs
 worker/stomp/go-elastic-monitoring/go-elastic-monitoring
 worker/stomp/go-elastic-monitoring/go-elastic-monitoring.config
+
+worker/stomp/go-stomp-client/go-deb
+worker/stomp/go-stomp-nominatim/go-deb
