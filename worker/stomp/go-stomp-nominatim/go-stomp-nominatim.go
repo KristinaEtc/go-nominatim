@@ -1,16 +1,16 @@
 package main
 
-//important: must execute first; do not move
 import (
 	"encoding/json"
 	"fmt"
 	"time"
 
+	//important: must execute first; do not move
+	_ "github.com/KristinaEtc/slflog"
+
 	"github.com/KristinaEtc/config"
 	"github.com/KristinaEtc/go-nominatim/lib"
-	_ "github.com/KristinaEtc/slflog"
 	"github.com/go-stomp/stomp"
-
 	_ "github.com/lib/pq"
 	"github.com/ventu-io/slf"
 )
@@ -38,10 +38,11 @@ type QueueOptConf struct {
 }
 
 type DiagnosticsConf struct {
-	CoeffEMA  float64
-	TopicName string
-	TimeOut   int // in seconds
-	MachineID string
+	CoeffEMA      float64
+	TopicName     string
+	TimeOut       int // in seconds
+	MachineID     string
+	CoeffSeverity float64
 }
 
 type ConnectionConf struct {
@@ -81,10 +82,11 @@ var globalOpt = ConfFile{
 		QueuePriorName: "/queue/nominatimPriorRequest",
 	},
 	DiagnConf: DiagnosticsConf{
-		CoeffEMA:  0.1,
-		TopicName: "/topic/worker.status",
-		TimeOut:   5,
-		MachineID: "defaultName",
+		CoeffEMA:      0.1,
+		TopicName:     "/topic/worker.status",
+		TimeOut:       5,
+		MachineID:     "defaultName",
+		CoeffSeverity: 2,
 	},
 	NominatimDB: NominatimConf{
 		DBname:   "nominatim",
@@ -129,11 +131,11 @@ type ErrorResponse struct {
 	Message string
 }
 
-// monitoringData is a struct which will be sended to a spetial topic
+// monitoringData is a struct which will be sended to a special topic
 // for diagnostics
 type monitoringData struct {
 	StartTime      string
-	CurrentTime    string
+	CurrentTime    string `json:utc`
 	LastReconnect  string
 	AverageRate    float64 // exponential moving average
 	ReconnectCount int
@@ -142,8 +144,9 @@ type monitoringData struct {
 	Reqs           int
 	ErrorCount     int
 	LastError      string
-	MachineID      string
-	MachineAddr    string
+	MachineID      string  `json:id`
+	MachineAddr    string  `json:ip`
+	Severity       float64 `json:severity`
 }
 
 //--------------------------------------------------------------------------
@@ -296,6 +299,7 @@ func requestLoop(subscribed chan bool, timeToMonitoring chan []byte) {
 		LastError:      "",
 		MachineAddr:    connSend.GetConnInfo(),
 		MachineID:      globalOpt.DiagnConf.MachineID,
+		Severity:       0.0,
 	}
 
 	ticker := time.NewTicker(time.Duration(globalOpt.DiagnConf.TimeOut) * time.Second)
@@ -311,6 +315,7 @@ func requestLoop(subscribed chan bool, timeToMonitoring chan []byte) {
 			break
 		case <-ticker.C:
 			data.CurrentTime = time.Now().Format(time.RFC3339)
+			calculateSeverity(data)
 			b, err := json.Marshal(data)
 			if err != nil {
 				log.Error(err.Error())
@@ -435,4 +440,11 @@ func main() {
 
 	<-stop
 	<-stop
+}
+
+func calculateSeverity(data monitoringData) {
+
+	if data.Reqs != 0 {
+		data.Severity = (float64(data.ErrorCount) * 100.0) / (float64(data.Reqs)) * globalOpt.DiagnConf.CoeffSeverity
+	}
 }
