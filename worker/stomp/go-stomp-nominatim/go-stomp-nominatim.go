@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 	"time"
 
 	//important: must execute first; do not move
@@ -62,6 +63,7 @@ type NominatimConf struct {
 
 // ConfFile is a file with all program options
 type ConfFile struct {
+	Name        string
 	ConnConf    ConnectionConf
 	DiagnConf   DiagnosticsConf
 	QueueConf   QueueOptConf
@@ -69,6 +71,7 @@ type ConfFile struct {
 }
 
 var globalOpt = ConfFile{
+	Name: "name",
 
 	ConnConf: ConnectionConf{
 		ServerAddr:     "localhost:61615",
@@ -147,6 +150,20 @@ type monitoringData struct {
 	MachineID      string  `json:id`
 	MachineAddr    string  `json:ip`
 	Severity       float64 `json:severity`
+
+	Type string `json:type`
+	Id   string `json:id`
+	Name string `json:name`
+
+	Subtype      string `json:subtype`
+	Subsystem    string `json:subsystem`
+	ComputerName string `json:computername`
+	UserName     string `json:username`
+	ProcessName  string `json:processname`
+	Version      string `json:version`
+	Pid          int    `json:pid`
+	//Tid          int    `json:tid`
+	Message string `json:message`
 }
 
 //--------------------------------------------------------------------------
@@ -288,6 +305,8 @@ func requestLoop(subscribed chan bool, timeToMonitoring chan []byte) {
 	close(subscribed)
 
 	timeStr := fmt.Sprintf("%s", time.Now().Format(time.RFC3339))
+	hostname, _ := os.Hostname()
+	//pid :=
 	var data = monitoringData{
 		StartTime:      string(time.Now().Format(time.RFC3339)),
 		LastReconnect:  timeStr,
@@ -300,6 +319,19 @@ func requestLoop(subscribed chan bool, timeToMonitoring chan []byte) {
 		MachineAddr:    connSend.GetConnInfo(),
 		MachineID:      globalOpt.DiagnConf.MachineID,
 		Severity:       0.0,
+
+		Type: "status",
+		Id:   "31073f61-fc2f-438b-b540-30b364dffe45",
+		Name: globalOpt.Name,
+
+		Subtype:      "worker",
+		Subsystem:    "",
+		ComputerName: hostname,
+		UserName:     fmt.Sprintf("%d", os.Getuid()),
+		ProcessName:  os.Args[0],
+		Version:      "0.7.4",
+		Pid:          os.Getpid(),
+		Message:      "",
 	}
 
 	ticker := time.NewTicker(time.Duration(globalOpt.DiagnConf.TimeOut) * time.Second)
