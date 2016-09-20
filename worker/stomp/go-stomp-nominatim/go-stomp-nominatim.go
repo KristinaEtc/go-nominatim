@@ -138,7 +138,7 @@ type ErrorResponse struct {
 // for diagnostics
 type monitoringData struct {
 	StartTime      string
-	CurrentTime    string `json:utc`
+	CurrentTime    string `json:"utc"`
 	LastReconnect  string
 	AverageRate    float64 // exponential moving average
 	ReconnectCount int
@@ -147,23 +147,22 @@ type monitoringData struct {
 	Reqs           int
 	ErrorCount     int
 	LastError      string
-	MachineID      string  `json:id`
-	MachineAddr    string  `json:ip`
-	Severity       float64 `json:severity`
+	MachineAddr    string  `json:"ip"`
+	Severity       float64 `json:"severity"`
 
-	Type string `json:type`
-	Id   string `json:id`
-	Name string `json:name`
+	Type string `json:"type"`
+	Id   string `json:"id"`
+	Name string `json:"name"`
 
-	Subtype      string `json:subtype`
-	Subsystem    string `json:subsystem`
-	ComputerName string `json:computername`
-	UserName     string `json:username`
-	ProcessName  string `json:processname`
-	Version      string `json:version`
-	Pid          int    `json:pid`
+	Subtype      string `json:"subtype"`
+	Subsystem    string `json:"subsystem"`
+	ComputerName string `json:"computer"`
+	UserName     string `json:"user"`
+	ProcessName  string `json:"process"`
+	Version      string `json:"version"`
+	Pid          int    `json:"pid"`
 	//Tid          int    `json:tid`
-	Message string `json:message`
+	Message string `json:"message"`
 }
 
 //--------------------------------------------------------------------------
@@ -317,7 +316,6 @@ func requestLoop(subscribed chan bool, timeToMonitoring chan []byte) {
 		ErrorCount:     0,
 		LastError:      "",
 		MachineAddr:    connSend.GetConnInfo(),
-		MachineID:      globalOpt.DiagnConf.MachineID,
 		Severity:       0.0,
 
 		Type: "status",
@@ -395,7 +393,7 @@ func requestLoop(subscribed chan bool, timeToMonitoring chan []byte) {
 			continue
 		}
 
-		err = connSend.Send(globalOpt.ConnConf.QueueFormat+*whoToSent, "text/plain",
+		err = connSend.Send(globalOpt.ConnConf.QueueFormat+*whoToSent, "application/json;charset=utf-8",
 			[]byte(replyJSON), nil...)
 		if err != nil {
 			data.MachineAddr = connSend.GetConnInfo()
