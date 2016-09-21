@@ -425,7 +425,7 @@ func sendStatus(timeToMonitoring chan []byte) {
 		select {
 		case data := <-timeToMonitoring:
 
-			err = connSend.Send(globalOpt.DiagnConf.TopicName, "text/json", data, nil...)
+			err = connSend.Send(globalOpt.DiagnConf.TopicName, "application/json", data, nil...)
 			if err != nil {
 				log.Errorf("Error %s", err.Error())
 				continue
