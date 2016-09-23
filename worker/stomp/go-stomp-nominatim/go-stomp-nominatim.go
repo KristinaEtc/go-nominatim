@@ -180,11 +180,14 @@ func createErrResponse(err error) []byte {
 
 func (p *Params) locationSearch(rawMsg []byte, geocode *Nominatim.ReverseGeocode) ([]byte, *string, bool, error) {
 
+	if len(rawMsg) == 0 {
+		return nil, nil, false, fmt.Errorf("%s", "Empty body request")
+	}
+
 	log.Debugf("Request: %s", rawMsg)
 
 	err := p.addCoordinatesToStruct(rawMsg)
 	if err != nil {
-		log.WithCaller(slf.CallerShort).Error(err.Error())
 		return nil, nil, false, err
 	}
 
@@ -257,23 +260,10 @@ func getLocationJSON(data Nominatim.DataWithoutDetails) ([]byte, error) {
 	return dataJSON, nil
 }
 
-func requestLoop(subscribed chan bool, timeToMonitoring chan []byte) {
+func runProcessLoop(reverseGeocode *Nominatim.ReverseGeocode, subscribed chan bool, timeToMonitoring chan []byte) {
 	defer func() {
 		stop <- true
 	}()
-
-	sqlOpenStr := "dbname=" + globalOpt.NominatimDB.DBname +
-		" host=" + globalOpt.NominatimDB.Host +
-		" user=" + globalOpt.NominatimDB.User +
-		" password=" + globalOpt.NominatimDB.Password
-
-	log.WithCaller(slf.CallerShort).Debugf("sqlOpenStr=%s", sqlOpenStr)
-
-	reverseGeocode, err := Nominatim.NewReverseGeocode(sqlOpenStr)
-	if err != nil {
-		log.WithCaller(slf.CallerShort).Error(err.Error())
-	}
-	defer reverseGeocode.Close()
 
 	connSubsc, err := stomp.Dial("tcp", globalOpt.ConnConf.ServerAddr, options...)
 	if err != nil {
@@ -303,37 +293,10 @@ func requestLoop(subscribed chan bool, timeToMonitoring chan []byte) {
 
 	close(subscribed)
 
-	timeStr := fmt.Sprintf("%s", time.Now().Format(time.RFC3339))
-	hostname, _ := os.Hostname()
-	//pid :=
-	var data = monitoringData{
-		StartTime:      string(time.Now().Format(time.RFC3339)),
-		LastReconnect:  timeStr,
-		ReconnectCount: 0,
-		ErrResp:        0,
-		SuccResp:       0,
-		AverageRate:    0.0,
-		ErrorCount:     0,
-		LastError:      "",
-		MachineAddr:    connSend.GetConnInfo(),
-		Severity:       0.0,
-
-		Type: "status",
-		Id:   "31073f61-fc2f-438b-b540-30b364dffe45",
-		Name: globalOpt.Name,
-
-		Subtype:      "worker",
-		Subsystem:    "",
-		ComputerName: hostname,
-		UserName:     fmt.Sprintf("%d", os.Getuid()),
-		ProcessName:  os.Args[0],
-		Version:      "0.7.4",
-		Pid:          os.Getpid(),
-		Message:      "",
-	}
+	// init a struct with info for monitoring queque
+	data := initMonitoringData(connSend.GetConnInfo())
 
 	ticker := time.NewTicker(time.Duration(globalOpt.DiagnConf.TimeOut) * time.Second)
-
 	var ok bool
 	var msg *stomp.Message
 	//	var queque string
@@ -361,11 +324,10 @@ func requestLoop(subscribed chan bool, timeToMonitoring chan []byte) {
 				continue
 			}
 		}
-
 		start := time.Now()
 
 		if !ok {
-			log.Warn("!ok")
+			log.Warn("msg, ok = <-sub.C: !ok")
 			data.ReconnectCount++
 			data.LastError = "Reconnect"
 			continue
@@ -374,9 +336,10 @@ func requestLoop(subscribed chan bool, timeToMonitoring chan []byte) {
 		reqJSON := msg.Body
 		var p Params
 		p.machineId = connSend.GetConnInfo()
+
 		replyJSON, whoToSent, errResp, err := p.locationSearch(reqJSON, reverseGeocode)
 		if err != nil {
-			log.WithCaller(slf.CallerShort).Errorf("Error: locationSearch %s", err.Error())
+			log.WithCaller(slf.CallerShort).Errorf("Error: locationSearch %s; fullMsg=%v", err.Error(), msg)
 			data.ErrorCount++
 			data.LastError = err.Error()
 			continue
@@ -385,12 +348,6 @@ func requestLoop(subscribed chan bool, timeToMonitoring chan []byte) {
 			data.ErrResp++
 		} else {
 			data.SuccResp++
-		}
-		if replyJSON == nil {
-			log.Warn("MUST NOT ENTERED")
-			data.ErrorCount++
-			data.LastError = "replyJSON == nil"
-			continue
 		}
 
 		err = connSend.Send(globalOpt.ConnConf.QueueFormat+*whoToSent, "application/json;charset=utf-8",
@@ -463,7 +420,15 @@ func main() {
 	log.Infof("VERSION=%s\n", Version)
 
 	log.Info("Starting working...")
-	go requestLoop(subscribed, timeout)
+
+	reverseGeocode, err := initReverseGeocode()
+	if err != nil {
+		log.WithCaller(slf.CallerShort).Error(err.Error())
+		os.Exit(1)
+	}
+	defer reverseGeocode.Close()
+
+	go runProcessLoop(reverseGeocode, subscribed, timeout)
 	<-subscribed
 
 	go sendStatus(timeout)
@@ -472,9 +437,58 @@ func main() {
 	<-stop
 }
 
+func initReverseGeocode() (*Nominatim.ReverseGeocode, error) {
+
+	sqlOpenStr := "dbname=" + globalOpt.NominatimDB.DBname +
+		" host=" + globalOpt.NominatimDB.Host +
+		" user=" + globalOpt.NominatimDB.User +
+		" password=" + globalOpt.NominatimDB.Password
+
+	log.WithCaller(slf.CallerShort).Debugf("sqlOpenStr=%s", sqlOpenStr)
+
+	reverseGeocode, err := Nominatim.NewReverseGeocode(sqlOpenStr)
+	if err != nil {
+		return nil, err
+	}
+	return reverseGeocode, nil
+}
+
 func calculateSeverity(data monitoringData) {
 
 	if data.Reqs != 0 {
 		data.Severity = (float64(data.ErrorCount) * 100.0) / (float64(data.Reqs)) * globalOpt.DiagnConf.CoeffSeverity
 	}
+}
+
+func initMonitoringData(machineAddr string) monitoringData {
+
+	timeStr := fmt.Sprintf("%s", time.Now().Format(time.RFC3339))
+	hostname, _ := os.Hostname()
+	//pid :=
+	data := monitoringData{
+		StartTime:      string(time.Now().Format(time.RFC3339)),
+		LastReconnect:  timeStr,
+		ReconnectCount: 0,
+		ErrResp:        0,
+		SuccResp:       0,
+		AverageRate:    0.0,
+		ErrorCount:     0,
+		LastError:      "",
+		MachineAddr:    machineAddr,
+		Severity:       0.0,
+
+		Type: "status",
+		Id:   "31073f61-fc2f-438b-b540-30b364dffe45",
+		Name: globalOpt.Name,
+
+		Subtype:      "worker",
+		Subsystem:    "",
+		ComputerName: hostname,
+		UserName:     fmt.Sprintf("%d", os.Getuid()),
+		ProcessName:  os.Args[0],
+		Version:      "0.7.4",
+		Pid:          os.Getpid(),
+		Message:      "",
+	}
+	return data
 }
