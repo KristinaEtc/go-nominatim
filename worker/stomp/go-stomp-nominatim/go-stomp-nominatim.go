@@ -51,6 +51,8 @@ type ConnectionConf struct {
 	ServerUser     string
 	ServerPassword string
 	QueueFormat    string
+	HeartBeatError int
+	HeartBeat      int
 }
 
 // NominatimConf options
@@ -78,6 +80,8 @@ var globalOpt = ConfFile{
 		QueueFormat:    "/queue/",
 		ServerUser:     "",
 		ServerPassword: "",
+		HeartBeat:      30,
+		HeartBeatError: 15,
 	},
 	QueueConf: QueueOptConf{
 		ResentFullReq:  true,
@@ -393,9 +397,13 @@ func sendStatus(timeToMonitoring chan []byte) {
 }
 
 func initOptions() {
+
 	options = []func(*stomp.Conn) error{
 		stomp.ConnOpt.Login(globalOpt.ConnConf.ServerUser, globalOpt.ConnConf.ServerPassword),
 		stomp.ConnOpt.Host(globalOpt.ConnConf.ServerAddr),
+		stomp.ConnOpt.HeartBeatError(time.Second * time.Duration(globalOpt.ConnConf.HeartBeatError)),
+		stomp.ConnOpt.HeartBeat(time.Second*time.Duration(globalOpt.ConnConf.HeartBeat),
+			time.Second*time.Duration(globalOpt.ConnConf.HeartBeat)),
 	}
 }
 
