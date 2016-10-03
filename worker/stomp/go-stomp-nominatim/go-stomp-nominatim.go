@@ -146,10 +146,10 @@ type monitoringData struct {
 	LastReconnect  string
 	AverageRate    float64 // exponential moving average
 	ReconnectCount int
-	ErrResp        int
-	SuccResp       int
-	Reqs           int
-	ErrorCount     int
+	ErrResp        int64
+	SuccResp       int64
+	Reqs           int64
+	ErrorCount     int64
 	LastError      string
 	MachineAddr    string  `json:"ip"`
 	Severity       float64 `json:"severity"`
@@ -167,6 +167,11 @@ type monitoringData struct {
 	Pid          int    `json:"pid"`
 	//Tid          int    `json:tid`
 	Message string `json:"message"`
+
+	RequestRate   int64 `json:"request_rate`
+	ErrorRate     int64 `json:"error_rate"`
+	ErrorRespRate int64 `json:"error__resp_rate"`
+	SuccessRate   int64 `json:"success_rate"`
 }
 
 //--------------------------------------------------------------------------
@@ -303,7 +308,10 @@ func runProcessLoop(reverseGeocode *Nominatim.ReverseGeocode, subscribed chan bo
 	ticker := time.NewTicker(time.Duration(globalOpt.DiagnConf.TimeOut) * time.Second)
 	var ok bool
 	var msg *stomp.Message
-	//	var queque string
+
+	// for requests/per sec; errors/per sec
+	var prevNumOfReq, prevNumOfErr, prevNumOfErrResp, prevNumOfSuccResp int64
+	//var queque string
 
 	for {
 		ok = false
@@ -312,8 +320,10 @@ func runProcessLoop(reverseGeocode *Nominatim.ReverseGeocode, subscribed chan bo
 			break
 		case <-ticker.C:
 			data.CurrentTime = time.Now().Format(time.RFC3339)
+			data.Reqs++
 			calculateSeverity(data)
-                        log.Infof("data: %v", data)
+			calculateRatePerSec(data, &prevNumOfReq, &prevNumOfErr, &prevNumOfErrResp, &prevNumOfSuccResp)
+			log.Infof("data: %v", data)
 			b, err := json.Marshal(data)
 			if err != nil {
 				log.Error(err.Error())
@@ -370,6 +380,33 @@ func runProcessLoop(reverseGeocode *Nominatim.ReverseGeocode, subscribed chan bo
 		//data.EMA = (data.EMA + elapsed) / 2
 		data.AverageRate = (1-globalOpt.DiagnConf.CoeffEMA)*data.AverageRate + globalOpt.DiagnConf.CoeffEMA*elapsed
 	}
+}
+
+//calculateRatePerSec(data, &prevNumOfReq, &prevNumOfErr, &prevNumOfErrResp)
+func calculateRatePerSec(data monitoringData, prevNumOfReq *int64, prevNumOfErr *int64, prevNumOfErrResp *int64, prevSuccR *int64) {
+
+	if globalOpt.DiagnConf.TimeOut == 0 {
+		log.Warn("globalOpt.DiagnConf.TimeOut = 0; could not calculate requests/per second")
+		return
+	}
+
+	period := int64(globalOpt.DiagnConf.TimeOut)
+	data.RequestRate = (data.Reqs - *(prevNumOfReq)) / period
+	data.ErrorRate = (data.ErrorCount - *(prevNumOfErr)) / period
+	data.ErrorRespRate = (data.ErrResp - *(prevNumOfErrResp)) / period
+
+	//calculating success responces
+	prevSuccResp := *prevNumOfReq - *prevNumOfErr - *prevNumOfErrResp
+	if prevSuccResp != *prevSuccR {
+		//for first time; to check that all right
+		log.Warn("Wrong success responce calculating")
+	}
+	data.SuccessRate = (data.SuccResp - prevSuccResp) / period
+
+	*prevNumOfErr = data.ErrorCount
+	*prevNumOfErrResp = data.ErrResp
+	*prevNumOfReq = data.Reqs
+	*prevSuccR = data.SuccResp
 }
 
 func sendStatus(timeToMonitoring chan []byte) {
@@ -498,6 +535,8 @@ func initMonitoringData(machineAddr string) monitoringData {
 		Version:      Version,
 		Pid:          os.Getpid(),
 		Message:      "",
+		RequestRate:  0,
+		ErrorRate:    0,
 	}
 	return data
 }
