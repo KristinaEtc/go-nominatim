@@ -524,7 +524,7 @@ func initMonitoringData(machineAddr string) monitoringData {
 		Severity:       0.0,
 
 		Type: "status",
-		Id:   "31073f61-fc2f-438b-b540-30b364dffe45",
+		Id:   "dev-worker-60",
 		Name: globalOpt.Name,
 
 		Subtype:      "worker",
