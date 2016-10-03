@@ -495,7 +495,7 @@ func initMonitoringData(machineAddr string) monitoringData {
 		ComputerName: hostname,
 		UserName:     fmt.Sprintf("%d", os.Getuid()),
 		ProcessName:  os.Args[0],
-		Version:      "0.7.4",
+		Version:      Version,
 		Pid:          os.Getpid(),
 		Message:      "",
 	}
