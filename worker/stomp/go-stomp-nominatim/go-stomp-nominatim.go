@@ -313,6 +313,7 @@ func runProcessLoop(reverseGeocode *Nominatim.ReverseGeocode, subscribed chan bo
 		case <-ticker.C:
 			data.CurrentTime = time.Now().Format(time.RFC3339)
 			calculateSeverity(data)
+                        log.Infof("data: %v", data)
 			b, err := json.Marshal(data)
 			if err != nil {
 				log.Error(err.Error())
