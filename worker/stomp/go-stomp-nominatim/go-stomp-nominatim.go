@@ -293,12 +293,12 @@ func runProcessLoop(reverseGeocode *Nominatim.ReverseGeocode, subscribed chan bo
 		return
 	}
 
-	subPrior, err := connSubsc.Subscribe(globalOpt.QueueConf.QueuePriorName, stomp.AckAuto)
-	if err != nil {
-		log.WithCaller(slf.CallerShort).Errorf("cannot subscribe to %s: %s",
-			globalOpt.QueueConf.QueueName, err.Error())
-		return
-	}
+	//subPrior, err := connSubsc.Subscribe(globalOpt.QueueConf.QueuePriorName, stomp.AckAuto)
+	//if err != nil {
+	//	log.WithCaller(slf.CallerShort).Errorf("cannot subscribe to %s: %s",
+	//		globalOpt.QueueConf.QueueName, err.Error())
+	//	return
+	//}
 
 	close(subscribed)
 
@@ -316,8 +316,8 @@ func runProcessLoop(reverseGeocode *Nominatim.ReverseGeocode, subscribed chan bo
 	for {
 		ok = false
 		select {
-		case msg, ok = <-subPrior.C:
-			break
+		case msg, ok = <-sub.C:
+			//break
 		case <-ticker.C:
 			data.CurrentTime = time.Now().Format(time.RFC3339)
 			data.Reqs++
@@ -330,14 +330,7 @@ func runProcessLoop(reverseGeocode *Nominatim.ReverseGeocode, subscribed chan bo
 				continue
 			}
 			timeToMonitoring <- b
-			continue
-		default:
-			select {
-			case msg, ok = <-sub.C:
-				break
-			default:
-				continue
-			}
+			//continue
 		}
 		start := time.Now()
 
