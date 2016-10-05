@@ -168,10 +168,10 @@ type monitoringData struct {
 	//Tid          int    `json:tid`
 	Message string `json:"message"`
 
-	RequestRate   int64 `json:"request_rate`
-	ErrorRate     int64 `json:"error_rate"`
-	ErrorRespRate int64 `json:"error__resp_rate"`
-	SuccessRate   int64 `json:"success_rate"`
+	RequestRate     int64 `json:"request_rate`
+	ErrorRate       int64 `json:"error_rate"`
+	ErrorRespRate   int64 `json:"error_resp_rate"`
+	SuccessRespRate int64 `json:"success_resp_rate"`
 }
 
 //--------------------------------------------------------------------------
@@ -392,9 +392,9 @@ func calculateRatePerSec(data monitoringData, prevNumOfReq *int64, prevNumOfErr 
 	prevSuccResp := *prevNumOfReq - *prevNumOfErr - *prevNumOfErrResp
 	if prevSuccResp != *prevSuccR {
 		//for first time; to check that all right
-		log.Warn("Wrong success responce calculating")
+		log.Warnf("Wrong success responce calculating %s %s", prevSuccResp, *prevSuccR)
 	}
-	data.SuccessRate = (data.SuccResp - prevSuccResp) / period
+	data.SuccessRespRate = (data.SuccResp - prevSuccResp) / period
 
 	*prevNumOfErr = data.ErrorCount
 	*prevNumOfErrResp = data.ErrResp
