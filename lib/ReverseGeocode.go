@@ -73,10 +73,21 @@ func dataMapToStruct(m map[string]string, id string, resentFullReq bool, fullR i
 
 func NewReverseGeocode(sqlOpenStr string) (*ReverseGeocode, error) {
 
+	log.Debugf("NewReverseGeocode %s", sqlOpenStr)
+
 	db, err := sql.Open("postgres", sqlOpenStr)
 	if err != nil {
+		log.Errorf("sql.Open error %s %v", sqlOpenStr, err)
 		return nil, err
 	}
+
+	var tmp int
+	err = db.QueryRow("SELECT 1").Scan(&tmp)
+	if err != nil {
+		log.Errorf("db.QueryRow %v", err)
+		return nil, err
+	}
+
 	r := ReverseGeocode{db: db}
 	//log.Println(r.db)
 	return &r, nil
