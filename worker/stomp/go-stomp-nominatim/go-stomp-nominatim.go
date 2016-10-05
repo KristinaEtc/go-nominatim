@@ -7,9 +7,9 @@ import (
 	"time"
 
 	//important: must execute first; do not move
-	"github.com/KristinaEtc/config"
 	_ "github.com/KristinaEtc/slflog"
 
+	"github.com/KristinaEtc/config"
 	"github.com/KristinaEtc/go-nominatim/lib"
 	"github.com/go-stomp/stomp"
 	_ "github.com/lib/pq"
