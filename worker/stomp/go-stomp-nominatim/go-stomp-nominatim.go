@@ -66,6 +66,7 @@ type NominatimConf struct {
 // ConfFile is a file with all program options
 type ConfFile struct {
 	Name        string
+	DirWithUUID string
 	ConnConf    ConnectionConf
 	DiagnConf   DiagnosticsConf
 	QueueConf   QueueOptConf
@@ -73,7 +74,8 @@ type ConfFile struct {
 }
 
 var globalOpt = ConfFile{
-	Name: "name",
+	Name:        "name",
+	DirWithUUID: ".go-stomp-nominatim/",
 
 	ConnConf: ConnectionConf{
 		ServerAddr:     "localhost:61615",
@@ -503,7 +505,7 @@ func initMonitoringData(machineAddr string) monitoringData {
 		Severity:       0.0,
 
 		Type: "status",
-		Id:   "dev-worker-60",
+		Id:   config.GetUUID(globalOpt.DirWithUUID),
 		Name: globalOpt.Name,
 
 		Subtype:      "worker",
