@@ -2,6 +2,8 @@ cli/config.json
 cli/main
 cli/test.txt
 cli/test.csv
+cli/main.config
+
 worker/logfile*
 worker/nsqd/test-client
 worker/nsqd/worker
