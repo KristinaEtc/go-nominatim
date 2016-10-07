@@ -32,6 +32,8 @@ var (
   Config option structures
 -------------------------*/
 
+var uuid string
+
 type QueueOptConf struct {
 	QueueName      string
 	QueuePriorName string
@@ -185,6 +187,8 @@ func main() {
 	//params := Params{}
 	config.ReadGlobalConfig(&globalOpt, "go-stomp-nominatim options")
 	initOptions()
+
+	uuid = config.GetUUID(globalOpt.DirWithUUID)
 
 	subscribed := make(chan bool)
 	timeout := make(chan []byte)
@@ -505,7 +509,7 @@ func initMonitoringData(machineAddr string) monitoringData {
 		Severity:       0.0,
 
 		Type: "status",
-		Id:   config.GetUUID(globalOpt.DirWithUUID),
+		Id:   uuid,
 		Name: globalOpt.Name,
 
 		Subtype:      "worker",
