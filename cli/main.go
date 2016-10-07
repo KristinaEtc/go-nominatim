@@ -1,16 +1,18 @@
 package main
 
 import (
-	"Nominatim/lib"
 	"database/sql"
-	"encoding/json"
 	"flag"
+
+	"github.com/KristinaEtc/config"
+	"github.com/KristinaEtc/go-nominatim/lib"
 	//"fmt"
 	"bufio"
-	_ "github.com/lib/pq"
 	"log"
 	"os"
 	"strconv"
+
+	_ "github.com/lib/pq"
 	// "testing"
 	//"fmt"
 	"strings"
@@ -41,6 +43,87 @@ type Params struct {
 	speedTest      bool
 }
 
+/*-------------------------
+  Config option structures
+-------------------------*/
+
+var uuid string
+
+type QueueOptConf struct {
+	QueueName      string
+	QueuePriorName string
+	ResentFullReq  bool
+}
+
+type DiagnosticsConf struct {
+	CoeffEMA      float64
+	TopicName     string
+	TimeOut       int // in seconds
+	MachineID     string
+	CoeffSeverity float64
+}
+
+type ConnectionConf struct {
+	ServerAddr     string
+	ServerUser     string
+	ServerPassword string
+	QueueFormat    string
+	HeartBeatError int
+	HeartBeat      int
+}
+
+// NominatimConf options
+type NominatimConf struct {
+	User     string
+	Password string
+	Host     string
+	DBname   string
+}
+
+// ConfFile is a file with all program options
+type ConfFile struct {
+	Name        string
+	DirWithUUID string
+	ConnConf    ConnectionConf
+	DiagnConf   DiagnosticsConf
+	QueueConf   QueueOptConf
+	NominatimDB NominatimConf
+}
+
+var globalOpt = ConfFile{
+	Name:        "name",
+	DirWithUUID: ".go-stomp-nominatim/",
+
+	ConnConf: ConnectionConf{
+		ServerAddr:     "localhost:61615",
+		QueueFormat:    "/queue/",
+		ServerUser:     "",
+		ServerPassword: "",
+		HeartBeat:      30,
+		HeartBeatError: 15,
+	},
+	QueueConf: QueueOptConf{
+		ResentFullReq:  true,
+		QueueName:      "/queue/nominatimRequest",
+		QueuePriorName: "/queue/nominatimPriorRequest",
+	},
+	DiagnConf: DiagnosticsConf{
+		CoeffEMA:      0.1,
+		TopicName:     "/topic/worker.status",
+		TimeOut:       5,
+		MachineID:     "defaultName",
+		CoeffSeverity: 2,
+	},
+	NominatimDB: NominatimConf{
+		DBname:   "nominatim",
+		Host:     "localhost",
+		User:     "geocode1",
+		Password: "_geocode1#",
+	},
+}
+
+//--------------------------------------------------------------------------
+
 func (p *Params) getParams() {
 
 	flag.StringVar(&(p.format), "f", "json", "format")
@@ -57,7 +140,7 @@ func (p *Params) getParams() {
 	return
 }
 
-func (p *Params) configurateDB() {
+/*func (p *Params) configurateDB() {
 
 	file, err := os.Open(configFile)
 	if err != nil {
@@ -72,6 +155,24 @@ func (p *Params) configurateDB() {
 		}
 		p.config = configuration
 	}
+}*/
+
+func initReverseGeocode() (*Nominatim.ReverseGeocode, error) {
+
+	log.Println("initReverseGeocode")
+
+	sqlOpenStr := "dbname=" + globalOpt.NominatimDB.DBname +
+		" host=" + globalOpt.NominatimDB.Host +
+		" user=" + globalOpt.NominatimDB.User +
+		" password=" + globalOpt.NominatimDB.Password
+
+	log.Printf("sqlOpenStr=%s", sqlOpenStr)
+
+	reverseGeocode, err := Nominatim.NewReverseGeocode(sqlOpenStr)
+	if err != nil {
+		return nil, err
+	}
+	return reverseGeocode, nil
 }
 
 func main() {
@@ -80,8 +181,10 @@ func main() {
 
 	p := Params{}
 
-	p.configurateDB()
+	//p.configurateDB()
 	p.getParams()
+
+	config.ReadGlobalConfig(&globalOpt, "go-stomp-nominatim options")
 
 	//log.Print(p)
 	var l []LocationParams
@@ -130,18 +233,17 @@ func main() {
 			numOfReq++
 		}
 	}
-	sqlOpenStr := "dbname=" + p.config.DBname +
-		" host=" + p.config.Host +
-		" user=" + p.config.User +
-		" password=" + p.config.Password
 
-	reverseGeocode, err := Nominatim.NewReverseGeocode(sqlOpenStr)
+	reverseGeocode, err := initReverseGeocode()
 	if err != nil {
-		log.Fatal(err)
+		log.Println(err.Error())
+		os.Exit(1)
 	}
+	defer reverseGeocode.Close()
+
 	found := 0
 	errors := 0
-	defer reverseGeocode.Close()
+
 	for _, data := range l {
 		//log.Println("Request:", i)
 
@@ -149,7 +251,9 @@ func main() {
 		reverseGeocode.SetIncludeAddressDetails(p.addressDetails)
 		reverseGeocode.SetZoom(data.zoom)
 		reverseGeocode.SetLocation(data.lat, data.lon)
-		place, err := reverseGeocode.Lookup()
+
+		place, err := reverseGeocode.Lookup(globalOpt.QueueConf.ResentFullReq)
+
 		if err != nil {
 			//log.Println(err)
 			errors++
