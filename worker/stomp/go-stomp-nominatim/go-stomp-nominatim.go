@@ -300,8 +300,8 @@ func runProcessLoop(reverseGeocode *Nominatim.ReverseGeocode, subscribed chan bo
 			//break
 		case <-ticker.C:
 			data.CurrentTime = time.Now().Format(time.RFC3339)
-			calculateSeverity(data)
-			calculateRatePerSec(data, &prevNumOfReq, &prevNumOfErr, &prevNumOfErrResp, &prevNumOfSuccResp)
+			calculateSeverity(&data)
+			calculateRatePerSec(&data, &prevNumOfReq, &prevNumOfErr, &prevNumOfErrResp, &prevNumOfSuccResp)
 			log.Infof("data: %v", data)
 			b, err := json.Marshal(data)
 			if err != nil {
@@ -450,17 +450,20 @@ func getLocationJSON(data Nominatim.DataWithoutDetails) ([]byte, error) {
 }
 
 //calculateRatePerSec(data, &prevNumOfReq, &prevNumOfErr, &prevNumOfErrResp)
-func calculateRatePerSec(data monitoringData, prevNumOfReq *int64, prevNumOfErr *int64, prevNumOfErrResp *int64, prevSuccR *int64) {
+func calculateRatePerSec(dataP *monitoringData, prevNumOfReq *int64, prevNumOfErr *int64, prevNumOfErrResp *int64, prevSuccR *int64) {
+
+	data := *dataP
 
 	if globalOpt.DiagnConf.TimeOut == 0 {
 		log.Warn("globalOpt.DiagnConf.TimeOut = 0; could not calculate requests/per second")
 		return
 	}
 
-	//log.Warnf(" BEFORE: prevNumOfReq=%dz, prevNumOfErr=%d, prevNumOfErrResp=%d, prevSuccR=%d", *prevNumOfReq, *prevNumOfErr, *prevNumOfErrResp, *prevSuccR)
-	//log.Warnf(" BEFORE: data.Reqs=%dz, data.ErrorCount=%d, data.ErrResp=%d, data.SuccResp=%d", data.Reqs, data.ErrorCount, data.ErrResp, data.SuccResp)
+	//log.Warnf(" BEFORE: prevNumOfReq=%d, prevNumOfErr=%d, prevNumOfErrResp=%d, prevSuccR=%d", *prevNumOfReq, *prevNumOfErr, *prevNumOfErrResp, *prevSuccR)
+	//log.Warnf(" BEFORE: data.Reqs=%d, data.ErrorCount=%d, data.ErrResp=%d, data.SuccResp=%d", data.Reqs, data.ErrorCount, data.ErrResp, data.SuccResp)
 
 	period := int64(globalOpt.DiagnConf.TimeOut)
+	//log.Infof("period=%d", period)
 
 	data.RequestRate = (data.Reqs - *(prevNumOfReq)) / period
 	data.ErrorRate = (data.ErrorCount - *(prevNumOfErr)) / period
@@ -473,6 +476,8 @@ func calculateRatePerSec(data monitoringData, prevNumOfReq *int64, prevNumOfErr 
 		log.Warnf("Wrong success responce calculating %d %d", prevSuccResp, *prevSuccR)
 	}
 	data.SuccessRespRate = (data.SuccResp - prevSuccResp) / period
+	log.Infof("dataP=%v", data)
+	*dataP = data
 
 	//log.Warnf("data.RequestRate =%d, data.ErrorRate=%d, data.ErrorRespRate=%d, data.SuccessRespRate=%d", data.RequestRate, data.ErrorRate, data.ErrorRespRate, data.SuccessRespRate)
 
@@ -484,11 +489,12 @@ func calculateRatePerSec(data monitoringData, prevNumOfReq *int64, prevNumOfErr 
 	//log.Warnf("AFTER: prevNumOfReq=%d, prevNumOfErr=%d, prevNumOfErrResp=%d, prevSuccR=%d", *prevNumOfReq, *prevNumOfErr, *prevNumOfErrResp, *prevSuccR)
 }
 
-func calculateSeverity(data monitoringData) {
+func calculateSeverity(data *monitoringData) {
 
-	if data.Reqs != 0 {
-		data.Severity = (float64(data.ErrorCount) * 100.0) / (float64(data.Reqs)) * globalOpt.DiagnConf.CoeffSeverity
+	if (*data).Reqs != 0 {
+		(*data).Severity = (float64((*data).ErrorCount) * 100.0) / (float64((*data).Reqs)) * globalOpt.DiagnConf.CoeffSeverity
 	}
+	log.Infof("sevetiry=%f", (*data).Severity)
 }
 
 func initMonitoringData(machineAddr string) monitoringData {
