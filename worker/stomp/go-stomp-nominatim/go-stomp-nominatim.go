@@ -494,7 +494,7 @@ func calculateSeverity(data *monitoringData) {
 	if (*data).Reqs != 0 {
 		(*data).Severity = (float64((*data).ErrorCount) * 100.0) / (float64((*data).Reqs)) * globalOpt.DiagnConf.CoeffSeverity
 	}
-	log.Infof("sevetiry=%f", (*data).Severity)
+	//log.Infof("severity=%f", (*data).Severity)
 }
 
 func initMonitoringData(machineAddr string) monitoringData {
