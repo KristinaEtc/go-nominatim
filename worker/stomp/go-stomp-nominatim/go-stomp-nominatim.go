@@ -172,10 +172,10 @@ type monitoringData struct {
 	//Tid          int    `json:tid`
 	Message string `json:"message"`
 
-	RequestRate     int64 `json:"request_rate`
-	ErrorRate       int64 `json:"error_rate"`
-	ErrorRespRate   int64 `json:"error_resp_rate"`
-	SuccessRespRate int64 `json:"success_resp_rate"`
+	RequestRate     float64 `json:"request_rate`
+	ErrorRate       float64 `json:"error_rate"`
+	ErrorRespRate   float64 `json:"error_resp_rate"`
+	SuccessRespRate float64 `json:"success_resp_rate"`
 }
 
 //--------------------------------------------------------------------------
@@ -450,7 +450,7 @@ func getLocationJSON(data Nominatim.DataWithoutDetails) ([]byte, error) {
 }
 
 //calculateRatePerSec(data, &prevNumOfReq, &prevNumOfErr, &prevNumOfErrResp)
-func calculateRatePerSec(dataP *monitoringData, prevNumOfReq *int64, prevNumOfErr *int64, prevNumOfErrResp *int64, prevSuccR *int64) {
+func calculateRatePerSec(dataP *monitoringData, prevNumOfReq, prevNumOfErr, prevNumOfErrResp, prevSuccR *int64) {
 
 	data := *dataP
 
@@ -462,12 +462,12 @@ func calculateRatePerSec(dataP *monitoringData, prevNumOfReq *int64, prevNumOfEr
 	//log.Warnf(" BEFORE: prevNumOfReq=%d, prevNumOfErr=%d, prevNumOfErrResp=%d, prevSuccR=%d", *prevNumOfReq, *prevNumOfErr, *prevNumOfErrResp, *prevSuccR)
 	//log.Warnf(" BEFORE: data.Reqs=%d, data.ErrorCount=%d, data.ErrResp=%d, data.SuccResp=%d", data.Reqs, data.ErrorCount, data.ErrResp, data.SuccResp)
 
-	period := int64(globalOpt.DiagnConf.TimeOut)
+	period := float64(globalOpt.DiagnConf.TimeOut)
 	//log.Infof("period=%d", period)
 
-	data.RequestRate = (data.Reqs - *(prevNumOfReq)) / period
-	data.ErrorRate = (data.ErrorCount - *(prevNumOfErr)) / period
-	data.ErrorRespRate = (data.ErrResp - *(prevNumOfErrResp)) / period
+	data.RequestRate = (float64(data.Reqs) - float64(*(prevNumOfReq))) / period
+	data.ErrorRate = (float64(data.ErrorCount) - float64(*(prevNumOfErr))) / period
+	data.ErrorRespRate = (float64(data.ErrResp) - float64(*(prevNumOfErrResp))) / period
 
 	//calculating success responces
 	prevSuccResp := *prevNumOfReq - *prevNumOfErr - *prevNumOfErrResp
@@ -475,7 +475,7 @@ func calculateRatePerSec(dataP *monitoringData, prevNumOfReq *int64, prevNumOfEr
 		//for first time; to check that all right
 		log.Warnf("Wrong success responce calculating %d %d", prevSuccResp, *prevSuccR)
 	}
-	data.SuccessRespRate = (data.SuccResp - prevSuccResp) / period
+	data.SuccessRespRate = (float64(data.SuccResp) - float64(prevSuccResp)) / period
 	log.Infof("dataP=%v", data)
 	*dataP = data
 
