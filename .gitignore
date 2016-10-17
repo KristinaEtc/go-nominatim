@@ -24,3 +24,4 @@ worker/stomp/go-elastic-monitoring/go-elastic-monitoring.config
 
 worker/stomp/go-stomp-client/go-deb
 worker/stomp/go-stomp-nominatim/go-deb
+.go-stomp-nominatim
