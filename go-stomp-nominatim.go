@@ -18,14 +18,21 @@ import (
 
 var log = slf.WithContext("go-stomp-nominatim.go")
 
+// These fields are populated by govvv
+
 var (
-	// These fields are populated by govvv
-	BuildDate  string
-	GitCommit  string
-	GitBranch  string
-	GitState   string
+	// BuildDate - binary build date
+	BuildDate string
+	// GitCommit - git commit hash
+	GitCommit string
+	// GitBranch - git branch name
+	GitBranch string
+	// GitState - working directory state (clean/dirty)
+	GitState string
+	// GitSummary - commit summary
 	GitSummary string
-	Version    string
+	// Version - file version
+	Version string
 )
 
 /*-------------------------
@@ -114,7 +121,7 @@ var globalOpt = ConfFile{
 
 var stop = make(chan bool)
 
-var options []func(*stomp.Conn) error = []func(*stomp.Conn) error{
+var options = []func(*stomp.Conn) error{
 	stomp.ConnOpt.Login("", ""),
 	stomp.ConnOpt.Host("127.0.0.1"),
 }
@@ -131,7 +138,7 @@ type Params struct {
 	clientReq      Req
 	format         string
 	addressDetails bool
-	machineId      string
+	machineID      string
 	//sqlOpenStr     string
 	//config         NominatimConf
 	//db             *sql.DB
@@ -159,7 +166,7 @@ type monitoringData struct {
 	Severity       float64 `json:"severity"`
 
 	Type string `json:"type"`
-	Id   string `json:"id"`
+	ID   string `json:"id"`
 	Name string `json:"name"`
 
 	Subtype      string `json:"subtype"`
@@ -324,7 +331,7 @@ func runProcessLoop(reverseGeocode *Nominatim.ReverseGeocode, subscribed chan bo
 
 		reqJSON := msg.Body
 		var p Params
-		p.machineId = connSend.GetConnInfo()
+		p.machineID = connSend.GetConnInfo()
 
 		replyJSON, whoToSent, errResp, err := p.locationSearch(reqJSON, reverseGeocode)
 		if err != nil {
@@ -427,7 +434,7 @@ func (p *Params) getLocationFromNominatim(reverseGeocode *Nominatim.ReverseGeoco
 	reverseGeocode.SetIncludeAddressDetails(p.addressDetails)
 	reverseGeocode.SetZoom(p.clientReq.Zoom)
 	reverseGeocode.SetLocation(p.clientReq.Lat, p.clientReq.Lon)
-	reverseGeocode.SetMachineID(p.machineId)
+	reverseGeocode.SetMachineID(p.machineID)
 
 	place, err := reverseGeocode.Lookup(globalOpt.QueueConf.ResentFullReq)
 	if err != nil {
@@ -515,7 +522,7 @@ func initMonitoringData(machineAddr string) monitoringData {
 		Severity:       0.0,
 
 		Type: "status",
-		Id:   uuid,
+		ID:   uuid,
 		Name: globalOpt.Name,
 
 		Subtype:      "worker",
