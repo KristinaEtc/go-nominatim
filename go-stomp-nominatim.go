@@ -1,13 +1,15 @@
 package main
 
 import (
+	//important: must execute first; do not move
+	_ "github.com/KristinaEtc/slflog"
+)
+
+import (
 	"encoding/json"
 	"fmt"
 	"os"
 	"time"
-
-	//important: must execute first; do not move
-	_ "github.com/KristinaEtc/slflog"
 
 	"github.com/KristinaEtc/config"
 	"github.com/KristinaEtc/go-nominatim/lib"
@@ -76,6 +78,7 @@ type NominatimConf struct {
 type ConfFile struct {
 	Name        string
 	DirWithUUID string
+	IsDebug     bool
 	ConnConf    ConnectionConf
 	DiagnConf   DiagnosticsConf
 	QueueConf   QueueOptConf
@@ -380,7 +383,9 @@ func (p *Params) locationSearch(rawMsg []byte, geocode *Nominatim.ReverseGeocode
 		return nil, nil, false, fmt.Errorf("%s", "Empty body request")
 	}
 
-	log.Debugf("Request: %s", rawMsg)
+	if globalOpt.IsDebug {
+		log.Debugf("Request: %s", rawMsg)
+	}
 
 	err := p.addCoordinatesToStruct(rawMsg)
 	if err != nil {
@@ -410,8 +415,9 @@ func (p *Params) locationSearch(rawMsg []byte, geocode *Nominatim.ReverseGeocode
 		log.WithCaller(slf.CallerShort).Error(err.Error())
 		return createErrResponse(err), &whoToSent, true, nil
 	}
-
-	log.Debugf("Client:%s ID:%d placeJSON:%s", p.clientReq.ClientID, p.clientReq.ID, string(placeJSON))
+	if globalOpt.IsDebug {
+		log.Debugf("Client:%s ID:%d placeJSON:%s", p.clientReq.ClientID, p.clientReq.ID, string(placeJSON))
+	}
 
 	return placeJSON, &whoToSent, false, nil
 
@@ -483,7 +489,7 @@ func calculateRatePerSec(dataP *monitoringData, prevNumOfReq, prevNumOfErr, prev
 		log.Warnf("Wrong success responce calculating %d %d", prevSuccResp, *prevSuccR)
 	}
 	data.SuccessRespRate = (float64(data.SuccResp) - float64(prevSuccResp)) / period
-	log.Infof("dataP=%v", data)
+
 	*dataP = data
 
 	//log.Warnf("data.RequestRate =%d, data.ErrorRate=%d, data.ErrorRespRate=%d, data.SuccessRespRate=%d", data.RequestRate, data.ErrorRate, data.ErrorRespRate, data.SuccessRespRate)
