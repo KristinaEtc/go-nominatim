@@ -4,24 +4,13 @@ cli/test.txt
 cli/test.csv
 cli/main.config
 
-worker/logfile*
-worker/nsqd/test-client
-worker/nsqd/worker
 *.log
-worker/stomp/go-stomp-nominatim/go-stomp-nominatim
-worker/stomp/go-stomp-client/go-stomp-client
 *.deb
 *.exe
 
 .vscode
 
-worker/stomp/go-stomp-nominatim/go-stomp-nominatim_navi2.config
-worker/stomp/go-stomp-nominatim/logs
-
-worker/stomp/go-elastic-monitoring/logs
-worker/stomp/go-elastic-monitoring/go-elastic-monitoring
-worker/stomp/go-elastic-monitoring/go-elastic-monitoring.config
-
-worker/stomp/go-stomp-client/go-deb
-worker/stomp/go-stomp-nominatim/go-deb
 .go-stomp-nominatim
+
+go-stomp-nominatim
+
