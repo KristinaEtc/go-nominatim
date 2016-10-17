@@ -172,7 +172,7 @@ type monitoringData struct {
 	//Tid          int    `json:tid`
 	Message string `json:"message"`
 
-	RequestRate     float64 `json:"request_rate`
+	RequestRate     float64 `json:"request_rate"`
 	ErrorRate       float64 `json:"error_rate"`
 	ErrorRespRate   float64 `json:"error_resp_rate"`
 	SuccessRespRate float64 `json:"success_resp_rate"`
