@@ -246,7 +246,7 @@ func (r *ReverseGeocode) Lookup(resentFullReq bool) (*DataWithoutDetails, error)
 	if iPlaceID.Valid && iMaxRank < 28 {
 		if iRank > 28 && iParentPlace.Valid {
 			iPlaceID = iParentPlace
-			log.Debugf("use parent place: %d", iParentPlace)
+			//log.Debugf("use parent place: %v", iParentPlace)
 		}
 
 		sSQL = `select address_place_id
