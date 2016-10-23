@@ -2,10 +2,10 @@ package Nominatim
 
 import (
 	"database/sql"
-	//"fmt"
+
 	_ "github.com/lib/pq"
 	"github.com/ventu-io/slf"
-	//"strconv"
+
 	"errors"
 )
 
@@ -38,27 +38,6 @@ func (d DataWithoutDetails) String() string {
 		//	"\nfullReq: " + d.FullReq.(string) +
 		"\ntimeReq: " + d.TimeReq + "\n"
 	return str
-}*/
-
-/*
-func dataMapToStruct(m map[string]string, id string, resentFullReq bool, fullR interface{}) *DataWithoutDetails {
-
-	t := time.Now().Format(time.RFC3339)
-
-	dataStr := DataWithoutDetails{PlaceID: m["place_id"],
-		OsmID:       m["osm_id"],
-		OsmType:     m["osm_type"],
-		Lat:         m["lat"],
-		Lon:         m["lon"],
-		Langaddress: m["langaddress"],
-		MachineID:   id,
-		TimeReq:     t,
-	}
-
-	if resentFullReq == true {
-		dataStr.FullReq = fullR
-	}
-	return &dataStr
 }*/
 
 //NewReverseGeocode - create working ReverseGeocode implemenation, using nominatim db
@@ -127,6 +106,7 @@ func zoomToRank(iZoom int) int {
 }
 
 func parsePlaceDataMap(m map[string]string) *ReverseGeocodeResponse {
+	//TODO: fix types - use float/int64/etc instead of string
 	return &ReverseGeocodeResponse{
 		PlaceID:     m["place_id"],
 		OsmID:       m["osm_id"],

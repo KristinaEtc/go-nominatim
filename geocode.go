@@ -26,20 +26,6 @@ type Response struct {
 	FullReq   interface{}
 }
 
-/*
-
-
-type params struct {
-	clientReq      Req
-	format         string
-	addressDetails bool
-	machineID      string
-	//sqlOpenStr     string
-	//config         NominatimConf
-	//db             *sql.DB
-}
-*/
-
 func locationSearch(rawMsg []byte, geocode Nominatim.ReverseGeocode, workerID string) ([]byte, *string, bool, error) {
 
 	if len(rawMsg) == 0 {
