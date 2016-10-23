@@ -7,7 +7,6 @@ import (
 
 import (
 	"encoding/json"
-	"fmt"
 	"os"
 	"time"
 
@@ -43,12 +42,14 @@ var (
 
 var uuid string
 
+//QueueOptConf - request/response queue Config
 type QueueOptConf struct {
 	QueueName      string
 	QueuePriorName string
 	ResentFullReq  bool
 }
 
+//DiagnosticsConf - worker status and diagnostics message configuration
 type DiagnosticsConf struct {
 	CoeffEMA      float64
 	TopicName     string
@@ -57,6 +58,7 @@ type DiagnosticsConf struct {
 	CoeffSeverity float64
 }
 
+//ConnectionConf - mq connection config
 type ConnectionConf struct {
 	ServerAddr     string
 	ServerUser     string
@@ -66,7 +68,7 @@ type ConnectionConf struct {
 	HeartBeat      int
 }
 
-// NominatimConf options
+// NominatimConf nominatim database connection options
 type NominatimConf struct {
 	User     string
 	Password string
@@ -79,6 +81,7 @@ type ConfFile struct {
 	Name        string
 	DirWithUUID string
 	IsDebug     bool
+	IsMock      bool
 	ConnConf    ConnectionConf
 	DiagnConf   DiagnosticsConf
 	QueueConf   QueueOptConf
@@ -129,63 +132,10 @@ var options = []func(*stomp.Conn) error{
 	stomp.ConnOpt.Host("127.0.0.1"),
 }
 
-type Req struct {
-	Lat      float64
-	Lon      float64
-	Zoom     int
-	ClientID string
-	ID       interface{}
-}
-
-type Params struct {
-	clientReq      Req
-	format         string
-	addressDetails bool
-	machineID      string
-	//sqlOpenStr     string
-	//config         NominatimConf
-	//db             *sql.DB
-}
-
+// ErrorResponse - struct for error answer to geocoding request
 type ErrorResponse struct {
 	Type    string
 	Message string
-}
-
-// monitoringData is a struct which will be sended to a special topic
-// for diagnostics
-type monitoringData struct {
-	StartTime      string
-	CurrentTime    string `json:"utc"`
-	LastReconnect  string
-	AverageRate    float64 // exponential moving average
-	ReconnectCount int
-	ErrResp        int64
-	SuccResp       int64
-	Reqs           int64
-	ErrorCount     int64
-	LastError      string
-	MachineAddr    string  `json:"ip"`
-	Severity       float64 `json:"severity"`
-
-	Type string `json:"type"`
-	ID   string `json:"id"`
-	Name string `json:"name"`
-
-	Subtype      string `json:"subtype"`
-	Subsystem    string `json:"subsystem"`
-	ComputerName string `json:"computer"`
-	UserName     string `json:"user"`
-	ProcessName  string `json:"process"`
-	Version      string `json:"version"`
-	Pid          int    `json:"pid"`
-	//Tid          int    `json:tid`
-	Message string `json:"message"`
-
-	RequestRate     float64 `json:"request_rate"`
-	ErrorRate       float64 `json:"error_rate"`
-	ErrorRespRate   float64 `json:"error_resp_rate"`
-	SuccessRespRate float64 `json:"success_resp_rate"`
 }
 
 //--------------------------------------------------------------------------
@@ -194,7 +144,6 @@ func main() {
 
 	log = slf.WithContext("go-stomp-nominatim.go")
 
-	//params := Params{}
 	config.ReadGlobalConfig(&globalOpt, "go-stomp-nominatim options")
 	initOptions()
 
@@ -241,9 +190,13 @@ func initOptions() {
 	}
 }
 
-func initReverseGeocode() (*Nominatim.ReverseGeocode, error) {
+func initReverseGeocode() (Nominatim.ReverseGeocode, error) {
 
 	log.Debug("initReverseGeocode")
+
+	if globalOpt.IsMock {
+		return Nominatim.NewReverseGeocodeMock(), nil
+	}
 
 	sqlOpenStr := "dbname=" + globalOpt.NominatimDB.DBname +
 		" host=" + globalOpt.NominatimDB.Host +
@@ -259,7 +212,7 @@ func initReverseGeocode() (*Nominatim.ReverseGeocode, error) {
 	return reverseGeocode, nil
 }
 
-func runProcessLoop(reverseGeocode *Nominatim.ReverseGeocode, subscribed chan bool, timeToMonitoring chan []byte) {
+func runProcessLoop(reverseGeocode Nominatim.ReverseGeocode, subscribed chan bool, timeToMonitoring chan []byte) {
 	defer func() {
 		stop <- true
 	}()
@@ -327,16 +280,18 @@ func runProcessLoop(reverseGeocode *Nominatim.ReverseGeocode, subscribed chan bo
 			log.Warn("msg, ok = <-sub.C: !ok")
 			data.ReconnectCount++
 			data.LastError = "Reconnect"
+			//data.LastReconnect = time.Now().In(time.UTC).Format(time.RFC3339)
+			data.LastReconnect = time.Now().Format(time.RFC3339)
 			continue
 		}
 
 		data.Reqs++
 
 		reqJSON := msg.Body
-		var p Params
-		p.machineID = connSend.GetConnInfo()
+		//var p params
+		//p.machineID = connSend.GetConnInfo()
 
-		replyJSON, whoToSent, errResp, err := p.locationSearch(reqJSON, reverseGeocode)
+		replyJSON, whoToSent, errResp, err := locationSearch(reqJSON, reverseGeocode, data.ID)
 		if err != nil {
 			log.WithCaller(slf.CallerShort).Errorf("Error: locationSearch %s; fullMsg=%v", err.Error(), msg)
 			data.ErrorCount++
@@ -352,7 +307,6 @@ func runProcessLoop(reverseGeocode *Nominatim.ReverseGeocode, subscribed chan bo
 		err = connSend.Send(globalOpt.ConnConf.QueueFormat+*whoToSent, "application/json;charset=utf-8",
 			[]byte(replyJSON), nil...)
 		if err != nil {
-			data.MachineAddr = connSend.GetConnInfo()
 			data.ErrorCount++
 			log.WithCaller(slf.CallerShort).Errorf("Failed to send to server %s", err)
 			time.Sleep(time.Second)
@@ -375,197 +329,4 @@ func createErrResponse(err error) []byte {
 		return nil
 	}
 	return bytes
-}
-
-func (p *Params) locationSearch(rawMsg []byte, geocode *Nominatim.ReverseGeocode) ([]byte, *string, bool, error) {
-
-	if len(rawMsg) == 0 {
-		return nil, nil, false, fmt.Errorf("%s", "Empty body request")
-	}
-
-	if globalOpt.IsDebug {
-		log.Debugf("Request: %s", rawMsg)
-	}
-
-	err := p.addCoordinatesToStruct(rawMsg)
-	if err != nil {
-		return nil, nil, false, err
-	}
-
-	whoToSent := p.clientReq.ClientID
-
-	if globalOpt.QueueConf.ResentFullReq == true {
-
-		var msgMapTemplate interface{}
-		err := json.Unmarshal(rawMsg, &msgMapTemplate)
-		if err != nil {
-			log.Panic("err != nil")
-		}
-		geocode.SetFullReq(msgMapTemplate)
-	}
-
-	place, err := p.getLocationFromNominatim(geocode)
-	if err != nil {
-		log.WithCaller(slf.CallerShort).Error(err.Error())
-		return createErrResponse(err), &whoToSent, true, nil
-	}
-
-	placeJSON, err := getLocationJSON(*place)
-	if err != nil {
-		log.WithCaller(slf.CallerShort).Error(err.Error())
-		return createErrResponse(err), &whoToSent, true, nil
-	}
-	if globalOpt.IsDebug {
-		log.Debugf("Client:%s ID:%d placeJSON:%s", p.clientReq.ClientID, p.clientReq.ID, string(placeJSON))
-	}
-
-	return placeJSON, &whoToSent, false, nil
-
-}
-
-func (p *Params) addCoordinatesToStruct(data []byte) error {
-
-	location := Req{}
-	if err := json.Unmarshal(data, &location); err != nil {
-		return err
-	}
-	p.clientReq = location
-
-	return nil
-}
-
-func (p *Params) getLocationFromNominatim(reverseGeocode *Nominatim.ReverseGeocode) (*Nominatim.DataWithoutDetails, error) {
-
-	//oReverseGeocode.SetLanguagePreference()
-	reverseGeocode.SetIncludeAddressDetails(p.addressDetails)
-	reverseGeocode.SetZoom(p.clientReq.Zoom)
-	reverseGeocode.SetLocation(p.clientReq.Lat, p.clientReq.Lon)
-	reverseGeocode.SetMachineID(p.machineID)
-
-	place, err := reverseGeocode.Lookup(globalOpt.QueueConf.ResentFullReq)
-	if err != nil {
-		return nil, err
-	}
-
-	place.ID = p.clientReq.ID
-
-	return place, nil
-}
-
-func getLocationJSON(data Nominatim.DataWithoutDetails) ([]byte, error) {
-
-	dataJSON, err := json.Marshal(data)
-	if err != nil {
-		log.WithCaller(slf.CallerShort).Error(err.Error())
-		return nil, err
-	}
-	return dataJSON, nil
-}
-
-//calculateRatePerSec(data, &prevNumOfReq, &prevNumOfErr, &prevNumOfErrResp)
-func calculateRatePerSec(dataP *monitoringData, prevNumOfReq, prevNumOfErr, prevNumOfErrResp, prevSuccR *int64) {
-
-	data := *dataP
-
-	if globalOpt.DiagnConf.TimeOut == 0 {
-		log.Warn("globalOpt.DiagnConf.TimeOut = 0; could not calculate requests/per second")
-		return
-	}
-
-	//log.Warnf(" BEFORE: prevNumOfReq=%d, prevNumOfErr=%d, prevNumOfErrResp=%d, prevSuccR=%d", *prevNumOfReq, *prevNumOfErr, *prevNumOfErrResp, *prevSuccR)
-	//log.Warnf(" BEFORE: data.Reqs=%d, data.ErrorCount=%d, data.ErrResp=%d, data.SuccResp=%d", data.Reqs, data.ErrorCount, data.ErrResp, data.SuccResp)
-
-	period := float64(globalOpt.DiagnConf.TimeOut)
-	//log.Infof("period=%d", period)
-
-	data.RequestRate = (float64(data.Reqs) - float64(*(prevNumOfReq))) / period
-	data.ErrorRate = (float64(data.ErrorCount) - float64(*(prevNumOfErr))) / period
-	data.ErrorRespRate = (float64(data.ErrResp) - float64(*(prevNumOfErrResp))) / period
-
-	//calculating success responces
-	prevSuccResp := *prevNumOfReq - *prevNumOfErr - *prevNumOfErrResp
-	if prevSuccResp != *prevSuccR {
-		//for first time; to check that all right
-		log.Warnf("Wrong success responce calculating %d %d", prevSuccResp, *prevSuccR)
-	}
-	data.SuccessRespRate = (float64(data.SuccResp) - float64(prevSuccResp)) / period
-
-	*dataP = data
-
-	//log.Warnf("data.RequestRate =%d, data.ErrorRate=%d, data.ErrorRespRate=%d, data.SuccessRespRate=%d", data.RequestRate, data.ErrorRate, data.ErrorRespRate, data.SuccessRespRate)
-
-	*prevNumOfErr = data.ErrorCount
-	*prevNumOfErrResp = data.ErrResp
-	*prevNumOfReq = data.Reqs
-	*prevSuccR = data.SuccResp
-
-	//log.Warnf("AFTER: prevNumOfReq=%d, prevNumOfErr=%d, prevNumOfErrResp=%d, prevSuccR=%d", *prevNumOfReq, *prevNumOfErr, *prevNumOfErrResp, *prevSuccR)
-}
-
-func calculateSeverity(data *monitoringData) {
-
-	if (*data).Reqs != 0 {
-		(*data).Severity = (float64((*data).ErrorCount) * 100.0) / (float64((*data).Reqs)) * globalOpt.DiagnConf.CoeffSeverity
-	}
-	//log.Infof("severity=%f", (*data).Severity)
-}
-
-func initMonitoringData(machineAddr string) monitoringData {
-
-	timeStr := fmt.Sprintf("%s", time.Now().Format(time.RFC3339))
-	hostname, _ := os.Hostname()
-	//pid :=
-	data := monitoringData{
-		StartTime:      string(time.Now().Format(time.RFC3339)),
-		LastReconnect:  timeStr,
-		ReconnectCount: 0,
-		ErrResp:        0,
-		SuccResp:       0,
-		AverageRate:    0.0,
-		ErrorCount:     0,
-		LastError:      "",
-		MachineAddr:    machineAddr,
-		Severity:       0.0,
-
-		Type: "status",
-		ID:   uuid,
-		Name: globalOpt.Name,
-
-		Subtype:      "worker",
-		Subsystem:    "",
-		ComputerName: hostname,
-		UserName:     fmt.Sprintf("%d", os.Getuid()),
-		ProcessName:  os.Args[0],
-		Version:      Version,
-		Pid:          os.Getpid(),
-		Message:      "",
-		RequestRate:  0,
-		ErrorRate:    0,
-	}
-	return data
-}
-
-func sendStatus(timeToMonitoring chan []byte) {
-
-	defer func() {
-		stop <- true
-	}()
-
-	connSend, err := stomp.Dial("tcp", globalOpt.ConnConf.ServerAddr, options...)
-	if err != nil {
-		log.Errorf("cannot connect to server %s", err.Error())
-		return
-	}
-	for {
-		select {
-		case data := <-timeToMonitoring:
-
-			err = connSend.Send(globalOpt.DiagnConf.TopicName, "application/json", data, nil...)
-			if err != nil {
-				log.Errorf("Error %s", err.Error())
-				continue
-			}
-
-		}
-	}
 }
