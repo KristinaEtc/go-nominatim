@@ -3,6 +3,8 @@ cli/main
 cli/test.txt
 cli/test.csv
 cli/main.config
+watcher/watcher.config
+watcher/watcher
 
 *.log
 *.deb

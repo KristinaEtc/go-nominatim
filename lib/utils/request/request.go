@@ -5,16 +5,16 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+
+	"github.com/KristinaEtc/go-nominatim/lib"
 )
 
 const pwdCurr string = "Nominatim/lib/utils/request"
 
 type Req struct {
-	Lat      float64 `json:Lat`
-	Lon      float64 `json:Lon`
-	Zoom     int     `json:Zoom`
-	ClientID string  `json:ClientID`
-	ID       int     `json:ID`
+	Nominatim.ReverseGeocodeRequest
+	ClientID string
+	ID       interface{}
 }
 
 func (r *Req) getLocationJSON() (string, error) {
@@ -27,7 +27,7 @@ func (r *Req) getLocationJSON() (string, error) {
 }
 
 //func MakeReq(parameters, clientID string, ID int, log l4g.Logger) (reqInJSON *string, err error) {
-func MakeReq(parameters, clientID string, ID int) (reqInJSON *string, err error) {
+func MakeReq(parameters, clientID string, ID string) (reqInJSON *string, err error) {
 
 	locSlice := strings.Split(parameters, ",")
 	if len(locSlice) < 3 {
@@ -56,4 +56,9 @@ func MakeReq(parameters, clientID string, ID int) (reqInJSON *string, err error)
 		return nil, err
 	}
 	return &jsonReq, nil
+}
+
+// GenerateAddress generates an address across the Belarus
+func GenerateAddress() string {
+	return "53.8225923,27.277391,18"
 }
