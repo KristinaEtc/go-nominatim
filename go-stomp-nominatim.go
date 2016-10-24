@@ -264,8 +264,10 @@ func runProcessLoop(reverseGeocode Nominatim.ReverseGeocode, subscribed chan boo
 		case <-ticker.C:
 			data.CurrentTime = time.Now().Format(time.RFC3339)
 			calculateSeverity(&data)
+			log.Infof("status: requests:%d/%d errors:%d/%d ok:%d/%d errResp:%d/%d",
+				data.Reqs-prevNumOfReq, data.SuccResp-prevNumOfSuccResp, data.ErrorCount-prevNumOfErr, data.ErrResp-prevNumOfErrResp,
+				data.Reqs, data.SuccResp, data.ErrorCount, data.ErrResp)
 			calculateRatePerSec(&data, &prevNumOfReq, &prevNumOfErr, &prevNumOfErrResp, &prevNumOfSuccResp)
-			log.Infof("data: %v", data)
 			b, err := json.Marshal(data)
 			if err != nil {
 				log.Error(err.Error())
