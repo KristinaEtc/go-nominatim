@@ -124,7 +124,7 @@ func initMonitoringData(machineAddr string) monitoringData {
 	return data
 }
 
-func sendStatus(timeToMonitoring chan []byte) {
+func sendStatus(monitoringCh chan []byte) {
 
 	defer func() {
 		stop <- true
@@ -137,7 +137,7 @@ func sendStatus(timeToMonitoring chan []byte) {
 	}
 	for {
 		select {
-		case data := <-timeToMonitoring:
+		case data := <-monitoringCh:
 
 			err = connSend.Send(globalOpt.DiagnConf.TopicName, "application/json", data, nil...)
 			if err != nil {

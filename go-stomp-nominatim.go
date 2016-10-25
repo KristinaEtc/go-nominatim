@@ -56,6 +56,7 @@ type DiagnosticsConf struct {
 	TimeOut       int // in seconds
 	MachineID     string
 	CoeffSeverity float64
+	BufferSize    int //monitoring channel bufferSize
 }
 
 //ConnectionConf - mq connection config
@@ -111,6 +112,7 @@ var globalOpt = ConfFile{
 		TimeOut:       5,
 		MachineID:     "defaultName",
 		CoeffSeverity: 2,
+		BufferSize:    60, //5 minutes worth of messages (with default 5 seconds TimeOut)
 	},
 	NominatimDB: NominatimConf{
 		DBname:   "nominatim",
@@ -150,7 +152,7 @@ func main() {
 	uuid = config.GetUUID(globalOpt.DirWithUUID)
 
 	subscribed := make(chan bool)
-	timeout := make(chan []byte)
+	timeout := make(chan []byte, globalOpt.DiagnConf.BufferSize)
 
 	log.Error("----------------------------------------------")
 
@@ -212,7 +214,7 @@ func initReverseGeocode() (Nominatim.ReverseGeocode, error) {
 	return reverseGeocode, nil
 }
 
-func runProcessLoop(reverseGeocode Nominatim.ReverseGeocode, subscribed chan bool, timeToMonitoring chan []byte) {
+func runProcessLoop(reverseGeocode Nominatim.ReverseGeocode, subscribed chan bool, monitoringCh chan []byte) {
 	defer func() {
 		stop <- true
 	}()
@@ -255,6 +257,7 @@ func runProcessLoop(reverseGeocode Nominatim.ReverseGeocode, subscribed chan boo
 	// for requests/per sec; errors/per sec
 	var prevNumOfReq, prevNumOfErr, prevNumOfErrResp, prevNumOfSuccResp int64
 	//var queque string
+	monitoringChannelFull := false
 
 	for {
 		ok = false
@@ -275,7 +278,16 @@ func runProcessLoop(reverseGeocode Nominatim.ReverseGeocode, subscribed chan boo
 				log.Error(err.Error())
 				continue
 			}
-			timeToMonitoring <- b
+			select {
+			case monitoringCh <- b:
+				monitoringChannelFull = false
+			default:
+				if !monitoringChannelFull {
+					monitoringChannelFull = true
+					log.Error("runProcessLog: monitoring channel full")
+				}
+			}
+
 			continue
 		}
 		start := time.Now()
