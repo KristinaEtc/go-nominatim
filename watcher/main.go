@@ -5,22 +5,22 @@ import (
 	"fmt"
 	"time"
 
+	_ "github.com/KristinaEtc/slflog"
+
 	"github.com/KristinaEtc/config"
 	"github.com/KristinaEtc/go-nominatim/lib/utils/request"
-	_ "github.com/KristinaEtc/slflog"
 	"github.com/go-stomp/stomp"
 	"github.com/ventu-io/slf"
 )
 
-var log = slf.WithContext("main.go")
-
-//var Conns []*stomp.Conn
+var log = slf.WithContext("watcher.go")
 
 /*-------------------------
   Config option structures
 -------------------------*/
 
 var configFile string
+var uuid string
 
 type ServerConf struct {
 	ServerAddr       string
@@ -31,18 +31,18 @@ type ServerConf struct {
 	ClientID         string
 	Heartbeat        int
 	//	RespondFreq    int
+	RespondFreq int // per minute
 	RequestFreq int // per second
-	conn        *stomp.Conn
 }
 
 // ConfFile is a file with all program options
 type ConfFile struct {
-	Server ServerConf
+	Server      ServerConf
+	DirWithUUID string
 }
 
 var globalOpt = ConfFile{
 	Server: ServerConf{
-		//RespondFreq: 60,
 		RequestFreq:      5,
 		ServerAddr:       "localhost:61614",
 		ServerUser:       "guest",
@@ -51,19 +51,180 @@ var globalOpt = ConfFile{
 		RequestQueueName: "/queue/nominatimRequest",
 		ClientID:         "clientID",
 		Heartbeat:        30,
-		//	RespondFreq    int
-	}}
-
-var options = []func(*stomp.Conn) error{
-//stomp.ConnOpt.Login(globalOpt.Global.ServerUser, globalOpt.Global.ServerPassword),
-//stomp.ConnOpt.Host(globalOpt.Global.ServerAddr),
+		RespondFreq:      1,
+	},
+	DirWithUUID: ".go-stomp-nominatim/",
 }
 
-var (
-	stop = make(chan bool)
-)
+/*-------------------------
+  Main process struncture
+-------------------------*/
 
-func connect(config *ServerConf) error {
+type Process struct {
+	connSend  *stomp.Conn
+	connSubsc *stomp.Conn
+	sub       *stomp.Subscription
+	reqIDs    chan string
+}
+
+var options = []func(*stomp.Conn) error{
+	stomp.ConnOpt.Login(globalOpt.Server.ServerUser, globalOpt.Server.ServerPassword),
+	stomp.ConnOpt.Host(globalOpt.Server.ServerAddr),
+}
+
+var stop = make(chan bool)
+
+func sendMessages(config ServerConf, pr Process) {
+
+	defer func() {
+		stop <- true
+	}()
+
+	// Every config.RequestFreq seconds function creates a request to a server
+	// with generated address, sends request and sends id of this request
+	// to channel reqIDs, which will be readed in recvMessages function.
+	for {
+
+		var i int64
+		ticker := time.NewTicker(time.Second * time.Duration(config.RequestFreq))
+
+		for t := range ticker.C {
+			reqAddr := request.GenerateAddress()
+			id := fmt.Sprintf("%d,%d", i, t.UnixNano()/1000000)
+			i++
+			reqInJSON, err := request.MakeReq(reqAddr, config.ClientID, id)
+			if err != nil {
+				log.Errorf("Error parse request parameters: [%v]", err)
+				continue
+			}
+
+			err = pr.connSend.Send(config.RequestQueueName, "text/json", []byte(*reqInJSON), nil...)
+			if err != nil {
+				log.Errorf("Failed to send to server: [%v]", err)
+				continue
+			}
+			pr.reqIDs <- id
+		}
+	}
+}
+
+func processMessages(config ServerConf, pr Process) {
+	defer func() {
+		stop <- true
+	}()
+
+	// checking requests: if timeout - increase the err value and delete it
+	tickerCheckIDs := time.NewTicker(time.Second * 1)
+	doneCheckIDs := make(chan time.Time)
+
+	go func() {
+		for t := range tickerCheckIDs.C {
+			doneCheckIDs <- t
+		}
+	}()
+
+	// sending statistics to spetial topic(s)
+	tickerResp := time.NewTicker(time.Second * 10)
+	doneChanResponse := make(chan time.Time)
+
+	go func() {
+		for t := range tickerResp.C {
+			doneChanResponse <- t
+		}
+	}()
+
+	// got answer from subscription
+	// separate goroutine is created, because in direct channel processing
+	// there are no possibility to check error
+	// case msg := sub.C
+	gotAnswerFromSub := make(chan []byte)
+	var errOthers int
+
+	go func() {
+
+		for {
+			msg, err := pr.sub.Read()
+			if err != nil {
+				log.Warnf("Error while reading from subcstibtion: %s", err.Error())
+				errOthers++
+				continue
+			}
+			gotAnswerFromSub <- msg.Body
+		}
+	}()
+
+	var IDs []string
+	var numOfReq, errTimeOut int
+
+	for {
+		select {
+
+		case msg := <-gotAnswerFromSub:
+
+			message := string(msg)
+			//if msgCount%globalOpt.Global.MessageDumpInterval == 0 {
+			log.Infof("Got message: %s", message)
+
+		case id := <-pr.reqIDs:
+			IDs = append(IDs, id)
+
+		case t := <-doneCheckIDs:
+			log.Debugf("Ticker ticked %v", t)
+
+			for key, id := range IDs {
+				timeWasSended, err := getTimeFromID(id)
+				if err != nil {
+					log.Errorf("Parsing id: %s", err.Error())
+					errOthers++
+					continue
+				}
+
+				duration := time.Since(*timeWasSended)
+				if duration.Seconds() >= 60 {
+					log.Warnf("timeout for %s", id)
+					errTimeOut++
+					IDs = append(IDs[:key], IDs[key+1:]...)
+				}
+			}
+
+		case _ = <-doneChanResponse:
+
+			reqInJSON, err := createReqBody(IDs, numOfReq)
+			if err != nil {
+				log.Errorf("Failed to create request to server: [%s]", err.Error())
+				errOthers++
+				continue
+			}
+
+			err = pr.connSend.Send(config.RequestQueueName, "text/json", []byte(*reqInJSON), nil...)
+			if err != nil {
+				log.Errorf("Failed to send to server: [%s]", err.Error())
+				errOthers++
+				continue
+			}
+
+			numOfReq = 0
+			errTimeOut = 0
+			errOthers = 0
+			IDs = IDs[:0]
+		}
+	}
+}
+
+func subscribe(node ServerConf, pr *Process) (err error) {
+
+	queueName := node.ReplyQueuePrefix + node.ClientID
+	log.Debugf("Subscribing to %s", queueName)
+
+	pr.sub, err = pr.connSubsc.Subscribe(queueName, stomp.AckAuto)
+	if err != nil {
+		log.Errorf("Cannot subscribe to %s: %v", queueName, err.Error())
+		return
+	}
+	return
+}
+
+func connect(config ServerConf, pr *Process) error {
 	//heartbeat := time.Duration(globalOpt.Global.Heartbeat) * time.Second
 	log.Infof("connect: %+v", config)
 
@@ -74,7 +235,13 @@ func connect(config *ServerConf) error {
 	}
 
 	var err error
-	config.conn, err = stomp.Dial("tcp", config.ServerAddr, options...)
+	pr.connSubsc, err = stomp.Dial("tcp", config.ServerAddr, options...)
+	if err != nil {
+		log.Errorf("cannot connect to server %v", err.Error())
+		return err
+	}
+
+	pr.connSend, err = stomp.Dial("tcp", config.ServerAddr, options...)
 	if err != nil {
 		log.Errorf("cannot connect to server %v", err.Error())
 		return err
@@ -82,101 +249,28 @@ func connect(config *ServerConf) error {
 	return nil
 }
 
-func sendMessages(config *ServerConf) {
-	defer func() {
-		stop <- true
-	}()
-
-	//connSend, err := Connect()
-	//if err != nil {
-	//	log.Errorf("[%v]: %s", node, err.Error() )
-	//	return
-	//}
-
-	for {
-
-		var i int64 = 0
-
-		ticker := time.NewTicker(time.Second * time.Duration(config.RequestFreq))
-
-		for t := range ticker.C {
-			reqAddr := request.GenerateAddress()
-			id := fmt.Sprintf("%d,%d", i, t.UnixNano()/1000000)
-			i++
-			reqInJSON, err := request.MakeReq(reqAddr, config.ClientID, id)
-			//reqInJSON, err := request.MakeReq(locs, clientID, i, log)
-			if err != nil {
-				log.Errorf("Error parse request parameters \"%v\"", err)
-				continue
-			}
-
-			err = config.conn.Send(config.RequestQueueName, "text/json", []byte(*reqInJSON), nil...)
-			if err != nil {
-				log.Errorf("Failed to send to server [%v]: %v", config, err)
-				continue
-			}
-		}
-
-	}
-
-}
-
-func recvMessages(subscribed chan bool, node *ServerConf) {
-	defer func() {
-		stop <- true
-	}()
-
-	queueName := node.ReplyQueuePrefix + node.ClientID
-	log.Debugf("Subscribing to %s", queueName)
-
-	sub, err := node.conn.Subscribe(queueName, stomp.AckAuto)
-	if err != nil {
-		log.Errorf("Cannot subscribe to %s: %v", queueName, err.Error())
-		return
-	}
-	close(subscribed)
-
-	var msgCount = 0
-	for {
-
-		msg, err := sub.Read()
-		if err != nil {
-			log.Warn("Got empty message; ignore")
-			//time.Sleep(time.Second)
-			continue
-		}
-		//time.Sleep(time.Second)
-		message := string(msg.Body)
-		//if msgCount%globalOpt.Global.MessageDumpInterval == 0 {
-		log.Infof("Got message: %s", message)
-		//time.Sleep(time.Second)
-		//}
-		msgCount++
-	}
-}
-
 func main() {
 
-	//log = slf.WithContext("main.go")
+	config.ReadGlobalConfig(&globalOpt, "watcher options")
 
-	subscribed := make(chan bool)
+	uuid = config.GetUUID(globalOpt.DirWithUUID)
 
-	config.ReadGlobalConfig(&globalOpt, "monitoring options")
+	r := make(chan string, 1)
+	process := Process{reqIDs: r}
 
 	log.Info("connecting...")
-	err := connect(&globalOpt.Server)
+	err := connect(globalOpt.Server, &process)
 	if err != nil {
 		log.Fatalf("connect: %s", err.Error())
 	}
 
+	log.Info("subscribing...")
+	err = subscribe(globalOpt.Server, &process)
+
 	log.Info("starting working...")
 
-	go recvMessages(subscribed, &globalOpt.Server)
-
-	// wait until we know the receiver has subscribed
-	<-subscribed
-
-	go sendMessages(&globalOpt.Server)
+	go processMessages(globalOpt.Server, process)
+	go sendMessages(globalOpt.Server, process)
 
 	<-stop
 	<-stop
