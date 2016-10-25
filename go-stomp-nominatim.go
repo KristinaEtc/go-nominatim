@@ -147,9 +147,8 @@ func main() {
 	log = slf.WithContext("go-stomp-nominatim.go")
 
 	config.ReadGlobalConfig(&globalOpt, "go-stomp-nominatim options")
-	initOptions()
-
 	uuid = config.GetUUID(globalOpt.DirWithUUID)
+	initOptions()
 
 	subscribed := make(chan bool)
 	timeout := make(chan []byte, globalOpt.DiagnConf.BufferSize)
@@ -186,6 +185,8 @@ func initOptions() {
 	options = []func(*stomp.Conn) error{
 		stomp.ConnOpt.Login(globalOpt.ConnConf.ServerUser, globalOpt.ConnConf.ServerPassword),
 		stomp.ConnOpt.Host(globalOpt.ConnConf.ServerAddr),
+		stomp.ConnOpt.Header("wormmq.link.peer_name", globalOpt.Name),
+		stomp.ConnOpt.Header("wormmq.link.peer", uuid),
 		stomp.ConnOpt.HeartBeatError(time.Second * time.Duration(globalOpt.ConnConf.HeartBeatError)),
 		stomp.ConnOpt.HeartBeat(time.Second*time.Duration(globalOpt.ConnConf.HeartBeat),
 			time.Second*time.Duration(globalOpt.ConnConf.HeartBeat)),
