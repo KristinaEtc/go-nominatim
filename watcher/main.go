@@ -28,6 +28,8 @@ type ServerConf struct {
 	ServerPassword   string
 	RequestQueueName string
 	ReplyQueuePrefix string
+	AlertTopic       string
+	MonitoringTopic  string
 	ClientID         string
 	Heartbeat        int
 	//	RespondFreq    int
@@ -49,6 +51,8 @@ var globalOpt = ConfFile{
 		ServerPassword:   "guest",
 		ReplyQueuePrefix: "/queue/",
 		RequestQueueName: "/queue/nominatimRequest",
+		AlertTopic:       "/topic/alerts",
+		MonitoringTopic:  "/topic/global_logs",
 		ClientID:         "clientID",
 		Heartbeat:        30,
 		RespondFreq:      1,
@@ -57,7 +61,7 @@ var globalOpt = ConfFile{
 }
 
 /*-------------------------
-  Main process struncture
+  Main process strunctures
 -------------------------*/
 
 type Process struct {
@@ -65,6 +69,10 @@ type Process struct {
 	connSubsc *stomp.Conn
 	sub       *stomp.Subscription
 	reqIDs    chan string
+}
+
+type NecessaryFields struct {
+	ID string `json:"id"`
 }
 
 var options = []func(*stomp.Conn) error{
@@ -164,6 +172,18 @@ func processMessages(config ServerConf, pr Process) {
 			message := string(msg)
 			//if msgCount%globalOpt.Global.MessageDumpInterval == 0 {
 			log.Infof("Got message: %s", message)
+			id, err := parseID(msg)
+			if err != nil {
+				log.Error(err.Error())
+				errOthers++
+			}
+			exist, key := containsInSlice(IDs, id.ID)
+			if !exist {
+				log.Warnf("Got message with wrong id: [%s]", id.ID)
+				errOthers++
+				continue
+			}
+			IDs = append(IDs[:key], IDs[key+1:]...)
 
 		case id := <-pr.reqIDs:
 			IDs = append(IDs, id)
@@ -196,11 +216,20 @@ func processMessages(config ServerConf, pr Process) {
 				continue
 			}
 
-			err = pr.connSend.Send(config.RequestQueueName, "text/json", []byte(*reqInJSON), nil...)
+			err = pr.connSend.Send(config.MonitoringTopic, "text/json", []byte(*reqInJSON), nil...)
 			if err != nil {
 				log.Errorf("Failed to send to server: [%s]", err.Error())
 				errOthers++
 				continue
+			}
+
+			if errTimeOut != 0 {
+				err = pr.connSend.Send(config.AlertTopic, "text/json", []byte(*reqInJSON), nil...)
+				if err != nil {
+					log.Errorf("Failed to send to server: [%s]", err.Error())
+					errOthers++
+					continue
+				}
 			}
 
 			numOfReq = 0

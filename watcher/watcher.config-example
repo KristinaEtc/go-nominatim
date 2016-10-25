@@ -5,7 +5,9 @@
     "ServerPassword": "guest",
     "ReplyQueuePrefix": "/queue/",
     "ReplyQueueName": "/queue/nominatimRequest",
-    "ClientID": "myiduuu"
+    "ClientID": "myiduuu",
+    "AlertTopic": "/topic/alerts",
+    "MonitoringTopic": "/topic/global_logs",
   },
   "Logs": {
     "Handlers": [
