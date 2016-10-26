@@ -8,12 +8,28 @@ import (
 	_ "github.com/KristinaEtc/slflog"
 
 	"github.com/KristinaEtc/config"
+	"github.com/KristinaEtc/go-nominatim/lib/monitoring"
 	"github.com/KristinaEtc/go-nominatim/lib/utils/request"
 	"github.com/go-stomp/stomp"
 	"github.com/ventu-io/slf"
 )
 
 var log = slf.WithContext("watcher.go")
+
+var (
+	// BuildDate - binary build date
+	BuildDate string
+	// GitCommit - git commit hash
+	GitCommit string
+	// GitBranch - git branch name
+	GitBranch string
+	// GitState - working directory state (clean/dirty)
+	GitState string
+	// GitSummary - commit summary
+	GitSummary string
+	// Version - file version
+	Version string
+)
 
 /*-------------------------
   Config option structures
@@ -64,15 +80,29 @@ var globalOpt = ConfFile{
   Main process strunctures
 -------------------------*/
 
+// Process is a struct with entities
+// which provide stomp-interaction
 type Process struct {
-	connSend  *stomp.Conn
-	connSubsc *stomp.Conn
-	sub       *stomp.Subscription
-	reqIDs    chan string
+	connSend  *stomp.Conn         //connection for sendind messages
+	connSubsc *stomp.Conn         //connection for subscribing
+	sub       *stomp.Subscription //subscribtion entity
+	reqIDs    chan string         //a channel for sending message's id
 }
 
 type NecessaryFields struct {
 	ID string `json:"id"`
+}
+
+type WatcherData struct {
+	*monitoring.MonitoringData
+	IDs               []string `json:"response_stat"`
+	ErrTimeOut        int64
+	CurrErrTimeOut    int64
+	CurrErrResponses  int64
+	CurrSuccResponses int64
+	CurrRequests      int64
+	CurrErrorCount    int64
+	CurrLastError     string
 }
 
 var options = []func(*stomp.Conn) error{
@@ -121,7 +151,16 @@ func processMessages(config ServerConf, pr Process) {
 		stop <- true
 	}()
 
-	// checking requests: if timeout - increase the err value and delete it
+	data := WatcherData{}
+	data.MonitoringData = monitoring.InitMonitoringData(
+		globalOpt.Server.ServerAddr,
+		Version,
+		globalOpt.Server.ClientID,
+		uuid,
+	)
+
+	// checking requests:
+	// if timeout - increase the err value and delete it
 	tickerCheckIDs := time.NewTicker(time.Second * 1)
 	doneCheckIDs := make(chan time.Time)
 
@@ -146,7 +185,6 @@ func processMessages(config ServerConf, pr Process) {
 	// there are no possibility to check error
 	// case msg := sub.C
 	gotAnswerFromSub := make(chan []byte)
-	var errOthers int
 
 	go func() {
 
@@ -154,7 +192,10 @@ func processMessages(config ServerConf, pr Process) {
 			msg, err := pr.sub.Read()
 			if err != nil {
 				log.Warnf("Error while reading from subcstibtion: %s", err.Error())
-				errOthers++
+				data.ErrorCount++
+				data.CurrErrorCount++
+				data.LastError = err.Error()
+				data.CurrLastError = err.Error()
 				continue
 			}
 			gotAnswerFromSub <- msg.Body
@@ -162,7 +203,6 @@ func processMessages(config ServerConf, pr Process) {
 	}()
 
 	var IDs []string
-	var numOfReq, errTimeOut int
 
 	for {
 		select {
@@ -175,18 +215,28 @@ func processMessages(config ServerConf, pr Process) {
 			id, err := parseID(msg)
 			if err != nil {
 				log.Error(err.Error())
-				errOthers++
+				data.ErrorCount++
+				data.CurrErrorCount++
+				data.LastError = err.Error()
+				data.CurrLastError = err.Error()
 			}
 			exist, key := containsInSlice(IDs, id.ID)
 			if !exist {
 				log.Warnf("Got message with wrong id: [%s]", id.ID)
-				errOthers++
+				data.ErrorCount++
+				data.CurrErrorCount++
+				data.LastError = err.Error()
+				data.CurrLastError = err.Error()
 				continue
 			}
 			IDs = append(IDs[:key], IDs[key+1:]...)
+			data.CurrSuccResponses++
+			data.SuccResp++
 
 		case id := <-pr.reqIDs:
 			IDs = append(IDs, id)
+			data.CurrRequests++
+			data.Reqs++
 
 		case t := <-doneCheckIDs:
 			log.Debugf("Ticker ticked %v", t)
@@ -194,47 +244,68 @@ func processMessages(config ServerConf, pr Process) {
 			for key, id := range IDs {
 				timeWasSended, err := getTimeFromID(id)
 				if err != nil {
-					log.Errorf("Parsing id: %s", err.Error())
-					errOthers++
+					data.ErrorCount++
+					data.CurrErrorCount++
+					data.LastError = err.Error()
+					data.CurrLastError = err.Error()
 					continue
 				}
 
 				duration := time.Since(*timeWasSended)
 				if duration.Seconds() >= 60 {
 					log.Warnf("timeout for %s", id)
-					errTimeOut++
+					data.ErrorCount++
+					data.LastError = fmt.Sprintf("TimeOut for %s", id)
+					data.ErrTimeOut++
+					data.CurrErrTimeOut++
+					data.CurrLastError = fmt.Sprintf("TimeOut for %s", id)
 					IDs = append(IDs[:key], IDs[key+1:]...)
 				}
 			}
 
 		case _ = <-doneChanResponse:
 
-			reqInJSON, err := createReqBody(IDs, numOfReq)
+			data.IDs = IDs
+			reqInJSON, err := getJSON(data)
 			if err != nil {
 				log.Errorf("Failed to create request to server: [%s]", err.Error())
-				errOthers++
+				data.ErrorCount++
+				data.CurrErrorCount++
+				data.LastError = err.Error()
+				data.CurrLastError = err.Error()
 				continue
 			}
 
-			err = pr.connSend.Send(config.MonitoringTopic, "text/json", []byte(*reqInJSON), nil...)
+			err = pr.connSend.Send(config.MonitoringTopic, "text/json", []byte(reqInJSON), nil...)
 			if err != nil {
 				log.Errorf("Failed to send to server: [%s]", err.Error())
-				errOthers++
+				data.ErrorCount++
+				data.CurrErrorCount++
+				data.LastError = err.Error()
+				data.CurrLastError = err.Error()
 				continue
 			}
 
-			if errTimeOut != 0 {
-				err = pr.connSend.Send(config.AlertTopic, "text/json", []byte(*reqInJSON), nil...)
+			if data.CurrErrTimeOut != 0 {
+				err = pr.connSend.Send(config.AlertTopic, "text/json", []byte(reqInJSON), nil...)
 				if err != nil {
 					log.Errorf("Failed to send to server: [%s]", err.Error())
-					errOthers++
+					data.ErrorCount++
+					data.CurrErrorCount++
+					data.LastError = err.Error()
+					data.CurrLastError = err.Error()
 					continue
 				}
 			}
 
-			numOfReq = 0
-			errTimeOut = 0
-			errOthers = 0
+			data.CurrErrorCount = 0
+			data.CurrErrResponses = 0
+			data.CurrSuccResponses = 0
+			data.CurrErrTimeOut = 0
+			data.CurrLastError = ""
+			data.CurrRequests = 0
+
+			data.ID = data.ID[:0]
 			IDs = IDs[:0]
 		}
 	}
@@ -279,6 +350,15 @@ func connect(config ServerConf, pr *Process) error {
 }
 
 func main() {
+
+	log.Error("----------------------------------------------")
+
+	log.Infof("BuildDate=%s\n", BuildDate)
+	log.Infof("GitCommit=%s\n", GitCommit)
+	log.Infof("GitBranch=%s\n", GitBranch)
+	log.Infof("GitState=%s\n", GitState)
+	log.Infof("GitSummary=%s\n", GitSummary)
+	log.Infof("VERSION=%s\n", Version)
 
 	config.ReadGlobalConfig(&globalOpt, "watcher options")
 

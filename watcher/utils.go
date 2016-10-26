@@ -3,9 +3,12 @@ package main
 import (
 	"encoding/json"
 	"errors"
+	"os"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/ventu-io/slf"
 )
 
 //--------
@@ -43,10 +46,6 @@ func getTimeFromID(id string) (*time.Time, error) {
 	return t, nil
 }
 
-func createReqBody(ids []string, numOdReq int) (*string, error) {
-	return nil, nil
-}
-
 func parseID(msg []byte) (*NecessaryFields, error) {
 
 	var data NecessaryFields
@@ -60,4 +59,20 @@ func parseID(msg []byte) (*NecessaryFields, error) {
 		return nil, errors.New("No utc value in request")
 	}
 	return &data, nil
+}
+
+func getJSON(data WatcherData) ([]byte, error) {
+	data.StartTime = time.Now().Format(time.RFC3339)
+
+	dataJSON, err := json.Marshal(data)
+	if err != nil {
+		log.WithCaller(slf.CallerShort).Error(err.Error())
+		return nil, err
+	}
+	log.Debugf("dataJSON=%v", dataJSON)
+
+	//debug mode
+	os.Exit(1)
+
+	return dataJSON, nil
 }
