@@ -232,7 +232,7 @@ func runProcessLoop(reverseGeocode Nominatim.ReverseGeocode, subscribed chan boo
 		return
 	}
 
-	sub, err := connSubsc.Subscribe(globalOpt.QueueConf.QueueName, stomp.AckAuto)
+	sub, err := connSubsc.Subscribe(globalOpt.QueueConf.QueueName, stomp.AckClient)
 	if err != nil {
 		log.WithCaller(slf.CallerShort).Errorf("cannot subscribe to %s: %s",
 			globalOpt.QueueConf.QueueName, err.Error())
@@ -301,6 +301,8 @@ func runProcessLoop(reverseGeocode Nominatim.ReverseGeocode, subscribed chan boo
 			data.LastReconnect = time.Now().Format(time.RFC3339)
 			continue
 		}
+
+		connSubsc.Ack(msg)
 
 		data.Reqs++
 
