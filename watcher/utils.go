@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/json"
 	"errors"
-	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -69,10 +68,10 @@ func getJSON(data WatcherData) ([]byte, error) {
 		log.WithCaller(slf.CallerShort).Error(err.Error())
 		return nil, err
 	}
-	log.Debugf("dataJSON=%v", dataJSON)
+	log.Debugf("dataJSON=%v", string(dataJSON))
 
 	//debug mode
-	os.Exit(1)
+	//os.Exit(1)
 
 	return dataJSON, nil
 }
