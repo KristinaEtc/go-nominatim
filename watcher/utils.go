@@ -10,9 +10,15 @@ import (
 	"github.com/ventu-io/slf"
 )
 
+// NecessaryFields storesrows of json request, that we want to get
+// and that should necessary be
+type NecessaryFields struct {
+	ID string `json:"id"`
+}
+
 //--------
 // utilits, u know
-func containsInSlice(s []string, e string) (bool, int) {
+func validateID(s []string, e string) (bool, int) {
 	for key, a := range s {
 		if a == e {
 			return true, key
@@ -22,42 +28,53 @@ func containsInSlice(s []string, e string) (bool, int) {
 }
 
 func parseUnixTime(s string) (*time.Time, error) {
+	log.Debugf("parseUnixTimeBefore=[%s]", s)
 	i, err := strconv.ParseInt(s, 10, 64)
 	if err != nil {
 		return nil, err
 	}
-	tm := time.Unix(i, 0)
-	log.Debugf("parseUnixTime=%v\n", tm)
+	tm := time.Unix(i, 0).In(time.UTC)
+	log.Debugf("parseUnixTime=[%v]", tm)
 	return &tm, nil
 
 }
 
-func getTimeFromID(id string) (*time.Time, error) {
+func parseID(id string) (int, *time.Time, error) {
 	wasSended := strings.SplitAfter(id, ",")
 	if len(wasSended) < 2 {
-		return nil, errors.New("Wrong id: no time parametr")
+		return 0, nil, errors.New("Wrong id: no time parametr")
 	}
 	t, err := parseUnixTime(wasSended[1])
 	if err != nil {
-		return nil, err
-
+		return 0, nil, err
 	}
-	return t, nil
+
+	numStr := strings.TrimSuffix(wasSended[0], ",")
+	log.Debugf("numStr=%s", numStr)
+	num, err := strconv.Atoi(numStr)
+	if err != nil {
+		return 0, t, err
+	}
+	//num, err := strconv.Atoi(strings.TrimPrefix(wasSended[0], ","))
+	//if err != nil {
+	//	return 0, t, err
+	//}
+	return num, t, nil
 }
 
-func parseID(msg []byte) (*NecessaryFields, error) {
+func getID(msg []byte) (int, *time.Time, error) {
 
 	var data NecessaryFields
 
 	if err := json.Unmarshal(msg, &data); err != nil {
-		log.Errorf("Could not get parse request: %s", err.Error())
-		return nil, err
+		log.Errorf("Could not parse response: %s", err.Error())
+		return 0, nil, err
 	}
 	if data.ID == "" {
-		log.Warnf("Wrong message %s", string(msg))
-		return nil, errors.New("No utc value in request")
+		log.Warnf("Messsage with empty ID: %s", string(msg))
+		return 0, nil, errors.New("No utc value in request")
 	}
-	return &data, nil
+	return parseID(data.ID)
 }
 
 func getJSON(data WatcherData) ([]byte, error) {
