@@ -5,6 +5,7 @@ cli/test.csv
 cli/main.config
 watcher/watcher.config
 watcher/watcher
+watcher/.watcher
 
 *.log
 *.deb
