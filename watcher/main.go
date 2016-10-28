@@ -219,14 +219,15 @@ func processMessages(config ServerConf, pr Process) {
 				data.CurrErrorCount++
 				data.LastError = err.Error()
 				data.CurrLastError = err.Error()
+				continue
 			}
 			exist, key := containsInSlice(IDs, id.ID)
 			if !exist {
 				log.Warnf("Got message with wrong id: [%s]", id.ID)
 				data.ErrorCount++
 				data.CurrErrorCount++
-				data.LastError = err.Error()
-				data.CurrLastError = err.Error()
+				data.LastError = fmt.Sprintf("Got message with wrong id: [%s]", id.ID)
+				data.CurrLastError = fmt.Sprintf("Got message with wrong id: [%s]", id.ID)
 				continue
 			}
 			IDs = append(IDs[:key], IDs[key+1:]...)
@@ -238,8 +239,8 @@ func processMessages(config ServerConf, pr Process) {
 			data.CurrRequests++
 			data.Reqs++
 
-		case t := <-doneCheckIDs:
-			log.Debugf("Ticker ticked %v", t)
+		case _ = <-doneCheckIDs:
+			//log.Debugf("Ticker ticked %v", t)
 
 			for key, id := range IDs {
 				timeWasSended, err := getTimeFromID(id)
@@ -266,6 +267,9 @@ func processMessages(config ServerConf, pr Process) {
 		case _ = <-doneChanResponse:
 
 			data.IDs = IDs
+			data.CurrentTime = time.Now().Format(time.RFC3339)
+			log.Errorf("data=%v", data.IDs)
+
 			reqInJSON, err := getJSON(data)
 			if err != nil {
 				log.Errorf("Failed to create request to server: [%s]", err.Error())
@@ -275,6 +279,8 @@ func processMessages(config ServerConf, pr Process) {
 				data.CurrLastError = err.Error()
 				continue
 			}
+
+			log.Errorf("reqInJSON=%s", reqInJSON)
 
 			err = pr.connSend.Send(config.MonitoringTopic, "text/json", []byte(reqInJSON), nil...)
 			if err != nil {
@@ -287,7 +293,7 @@ func processMessages(config ServerConf, pr Process) {
 			}
 
 			if data.CurrErrTimeOut != 0 {
-				err = pr.connSend.Send(config.AlertTopic, "text/json", []byte(reqInJSON), nil...)
+				/*err = pr.connSend.Send(config.AlertTopic, "text/json", []byte(reqInJSON), nil...)
 				if err != nil {
 					log.Errorf("Failed to send to server: [%s]", err.Error())
 					data.ErrorCount++
@@ -295,7 +301,7 @@ func processMessages(config ServerConf, pr Process) {
 					data.LastError = err.Error()
 					data.CurrLastError = err.Error()
 					continue
-				}
+				}*/
 			}
 
 			data.CurrErrorCount = 0
@@ -305,7 +311,7 @@ func processMessages(config ServerConf, pr Process) {
 			data.CurrLastError = ""
 			data.CurrRequests = 0
 
-			data.ID = data.ID[:0]
+			data.IDs = data.IDs[:0]
 			IDs = IDs[:0]
 		}
 	}
