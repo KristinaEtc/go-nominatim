@@ -42,7 +42,7 @@ var uuid string
 type ServerConf struct {
 	ServerAddr       string
 	ServerUser       string
-	ServerPassword   string
+	ServerPassword  send string
 	RequestQueueName string
 	ReplyQueuePrefix string
 	AlertTopic       string
@@ -140,7 +140,7 @@ func sendMessages(config ServerConf, pr Process) {
 				continue
 			}
 
-			err = pr.connSend.Send(config.RequestQueueName, "text/json", []byte(*reqInJSON), nil...)
+			err = pr.connSend.Send(config.RequestQueueName, "application/json", []byte(*reqInJSON), nil...)
 			if err != nil {
 				log.Errorf("Failed to send to server: [%v]", err)
 				continue
