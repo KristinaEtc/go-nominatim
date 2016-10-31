@@ -52,6 +52,7 @@ type ServerConf struct {
 	//	RespondFreq    int
 	RespondFreq int // per minute
 	RequestFreq int // per second
+	Name        string
 }
 
 // ConfFile is a file with all program options
@@ -69,10 +70,11 @@ var globalOpt = ConfFile{
 		ReplyQueuePrefix: "/queue/",
 		RequestQueueName: "/queue/nominatimRequest",
 		AlertTopic:       "/topic/alerts",
-		MonitoringTopic:  "/topic/global_logs",
+		MonitoringTopic:  "/topic/global_logss",
 		ClientID:         "clientID",
 		Heartbeat:        30,
 		RespondFreq:      1,
+		Name:             "userName",
 	},
 	DirWithUUID: ".watcher/",
 }
@@ -106,6 +108,8 @@ type WatcherData struct {
 var options = []func(*stomp.Conn) error{
 	stomp.ConnOpt.Login(globalOpt.Server.ServerUser, globalOpt.Server.ServerPassword),
 	stomp.ConnOpt.Host(globalOpt.Server.ServerAddr),
+	stomp.ConnOpt.Header("wormmq.link.peer_name", globalOpt.Server.Name),
+	stomp.ConnOpt.Header("wormmq.link.peer", uuid),
 }
 
 var stop = make(chan bool)
