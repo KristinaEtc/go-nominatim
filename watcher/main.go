@@ -2,6 +2,7 @@ package main
 
 //important: must execute first; do not move
 import (
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -278,9 +279,11 @@ func processMessages(config ServerConf, pr Process) {
 			data.IDs = IDs
 			data.CurrentTime = time.Now().UTC().Format(time.RFC3339)
 			data.Subtype = "watcher"
-			//log.Debugf("data Map=%v", data.IDs)
 
-			reqInJSON, err := getJSON(data)
+			//log.Debugf("data Map=%v", data.IDs)
+			data.StartTime = time.Now().Format(time.RFC3339)
+
+			reqInJSON, err := json.Marshal(data)
 			if err != nil {
 				log.Errorf("Failed to create request to server: [%s]", err.Error())
 				data.ErrorCount++

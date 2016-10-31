@@ -6,8 +6,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
-
-	"github.com/ventu-io/slf"
+	//"github.com/ventu-io/slf"
 )
 
 // NecessaryFields storesrows of json request, that we want to get
@@ -80,20 +79,4 @@ func getID(msg []byte) (int, int64, error) {
 		return 0, 0, errors.New("No utc value in request")
 	}
 	return parseID(data.ID)
-}
-
-func getJSON(data WatcherData) ([]byte, error) {
-	data.StartTime = time.Now().Format(time.RFC3339)
-
-	dataJSON, err := json.Marshal(data)
-	if err != nil {
-		log.WithCaller(slf.CallerShort).Error(err.Error())
-		return nil, err
-	}
-	//log.Debugf("dataJSON=%v", string(dataJSON))
-
-	//debug mode
-	//os.Exit(1)
-
-	return dataJSON, nil
 }
