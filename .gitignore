@@ -4,6 +4,7 @@ cli/test.txt
 cli/test.csv
 
 watcher/watcher
+notifier/notifier
 
 */logs
 */*.config

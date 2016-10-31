@@ -6,6 +6,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/KristinaEtc/alert"
 	"github.com/KristinaEtc/config"
 	_ "github.com/KristinaEtc/slflog"
 	"github.com/go-stomp/stomp"
@@ -141,7 +142,8 @@ func recvMessages() {
 			return
 		}
 
-		popUpNotify(id)
+		go alert.PopUpNotify(id)
+		go alert.PlayMusic("7.aiff")
 
 		msgCount++
 	}
