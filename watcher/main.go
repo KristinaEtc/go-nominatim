@@ -298,8 +298,10 @@ func processMessages(config ServerConf, pr Process) {
 				continue
 			}
 
-			if data.CurrErrTimeOut != 0 {
-				/*err = pr.connSend.Send(config.AlertTopic, "text/json", []byte(reqInJSON), nil...)
+			//IMPORTANT: TEST_MODE
+			if data.CurrErrTimeOut == 0 {
+				log.Debug("Sending alert message...")
+				err = pr.connSend.Send(config.AlertTopic, "text/json", []byte(reqInJSON), nil...)
 				if err != nil {
 					log.Errorf("Failed to send to server: [%s]", err.Error())
 					data.ErrorCount++
@@ -307,7 +309,7 @@ func processMessages(config ServerConf, pr Process) {
 					data.LastError = err.Error()
 					data.CurrLastError = err.Error()
 					continue
-				}*/
+				}
 			}
 
 			data.CurrErrorCount = 0
