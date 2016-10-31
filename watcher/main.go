@@ -298,7 +298,7 @@ func processMessages(config ServerConf, pr Process) {
 				continue
 			}
 
-			if data.CurrErrTimeOut != 0 {
+			if data.CurrErrTimeOut == 0 {
 				log.Debug("Sending alert message...")
 				err = pr.connSend.Send(config.AlertTopic, "text/json", []byte(reqInJSON), nil...)
 				if err != nil {
