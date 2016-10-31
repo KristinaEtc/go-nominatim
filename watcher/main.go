@@ -93,7 +93,7 @@ type Process struct {
 // WatcherData stores data, that will be sended to a topic
 type WatcherData struct {
 	*monitoring.MonitoringData
-	IDs               map[int]*time.Time `json:"response_stat"`
+	IDs               map[int]int64 `json:"response_stat"`
 	ErrTimeOut        int64
 	CurrErrTimeOut    int64
 	CurrErrResponses  int64
@@ -127,10 +127,10 @@ func sendMessages(config ServerConf, pr Process) {
 
 		for t := range ticker.C {
 			reqAddr := request.GenerateAddress()
-			id := fmt.Sprintf("%d,%d", i, t.UnixNano()/int64(time.Millisecond))
+			id := fmt.Sprintf("%d,%d", i, t.UTC().Unix())
 
 			i++
-			reqInJSON, err := request.MakeReq(reqAddr, config.ClientID, id)
+			reqInJSON, err := request.MakeReq(reqAddr, uuid, id)
 			if err != nil {
 				log.Errorf("Error parse request parameters: [%v]", err)
 				continue
@@ -155,7 +155,8 @@ func processMessages(config ServerConf, pr Process) {
 	data.MonitoringData = monitoring.InitMonitoringData(
 		globalOpt.Server.ServerAddr,
 		Version,
-		globalOpt.Server.ClientID,
+		uuid,
+		//globalOpt.Server.ClientID,
 		uuid,
 	)
 
@@ -203,7 +204,7 @@ func processMessages(config ServerConf, pr Process) {
 	// select loop
 	// where the whole logic is implemented
 
-	var IDs = make(map[int]*time.Time)
+	var IDs = make(map[int]int64)
 
 	for {
 		select {
@@ -224,11 +225,13 @@ func processMessages(config ServerConf, pr Process) {
 			}
 
 			if _, ok := IDs[num]; !ok {
-				log.Warnf("No requests was sended with such id: [%d,%s]", num, timeR.String())
+				log.Warnf("No requests was sended with such id: [%d,%d]", num, timeR)
+				log.Warnf("IDs: [%v]", IDs)
+
 				data.ErrorCount++
 				data.CurrErrorCount++
-				data.LastError = fmt.Sprintf("No requests was sended with such id: [%d,%s]", num, timeR.String())
-				data.CurrLastError = fmt.Sprintf("No requests was sended with such id: [%d,%s]", num, timeR.String())
+				data.LastError = fmt.Sprintf("No requests was sended with such id: [%d,%d]", num, timeR)
+				data.CurrLastError = fmt.Sprintf("No requests was sended with such id: [%d,%d]", num, timeR)
 				continue
 			}
 			delete(IDs, num)
@@ -249,19 +252,19 @@ func processMessages(config ServerConf, pr Process) {
 			data.CurrRequests++
 			data.Reqs++
 
-		case _ = <-checkIDs:
+		case t := <-checkIDs:
 			//log.Debugf("Ticker ticked %v", t)
 
 			for num, timeR := range IDs {
 
-				duration := time.Since(*timeR)
-				if duration.Seconds() >= 60 {
-					log.Warnf("timeout for: [%d,%s]", num, timeR.String())
+				duration := t.UTC().Unix() - timeR
+				if duration >= 60 {
+					log.Warnf("timeout for: [%d,%d]", num, timeR)
 					data.ErrorCount++
-					data.LastError = fmt.Sprintf("TimeOut for: [%d,%s]", num, timeR.String())
+					data.LastError = fmt.Sprintf("TimeOut for: [%d,%d]", num, timeR)
 					data.ErrTimeOut++
 					data.CurrErrTimeOut++
-					data.CurrLastError = fmt.Sprintf("TimeOut for [%d,%s]", num, timeR.String())
+					data.CurrLastError = fmt.Sprintf("TimeOut for: [%d,%d]", num, timeR)
 					delete(IDs, num)
 				}
 			}
@@ -269,9 +272,9 @@ func processMessages(config ServerConf, pr Process) {
 		case _ = <-sendStatusMSg:
 
 			data.IDs = IDs
-			data.CurrentTime = time.Now().Format(time.RFC3339)
+			data.CurrentTime = time.Now().UTC().Format(time.RFC3339)
 			data.Subtype = "watcher"
-			log.Debugf("data=%v", data.IDs)
+			//log.Debugf("data Map=%v", data.IDs)
 
 			reqInJSON, err := getJSON(data)
 			if err != nil {
@@ -283,7 +286,7 @@ func processMessages(config ServerConf, pr Process) {
 				continue
 			}
 
-			log.Errorf("reqInJSON=%s", reqInJSON)
+			log.Debugf("Status Message=%s", reqInJSON)
 
 			err = pr.connSend.Send(config.MonitoringTopic, "text/json", []byte(reqInJSON), nil...)
 			if err != nil {
@@ -314,8 +317,8 @@ func processMessages(config ServerConf, pr Process) {
 			data.CurrLastError = ""
 			data.CurrRequests = 0
 
-			data.IDs = make(map[int]*time.Time)
-			IDs = make(map[int]*time.Time)
+			data.IDs = make(map[int]int64)
+			IDs = make(map[int]int64)
 		}
 	}
 }

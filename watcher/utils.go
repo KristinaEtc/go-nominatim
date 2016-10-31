@@ -33,24 +33,29 @@ func parseUnixTime(s string) (*time.Time, error) {
 	if err != nil {
 		return nil, err
 	}
-	tm := time.Unix(i, 0).In(time.UTC)
+
+	tm := time.Unix(i, 0)
 	log.Debugf("parseUnixTime=[%v]", tm)
 	return &tm, nil
 
 }
 
-func parseID(id string) (int, *time.Time, error) {
+func parseID(id string) (int, int64, error) {
 	wasSended := strings.SplitAfter(id, ",")
 	if len(wasSended) < 2 {
-		return 0, nil, errors.New("Wrong id: no time parametr")
+		return 0, 0, errors.New("Wrong id: no time parametr")
 	}
-	t, err := parseUnixTime(wasSended[1])
+	/*t, err := parseUnixTime(wasSended[1])
 	if err != nil {
-		return 0, nil, err
+		return 0,0, err
+	}*/
+	t, err := strconv.ParseInt(wasSended[1], 10, 64)
+	if err != nil {
+		return 0, 0, err
 	}
 
 	numStr := strings.TrimSuffix(wasSended[0], ",")
-	log.Debugf("numStr=%s", numStr)
+	//log.Debugf("numStr=%s", numStr)
 	num, err := strconv.Atoi(numStr)
 	if err != nil {
 		return 0, t, err
@@ -62,17 +67,17 @@ func parseID(id string) (int, *time.Time, error) {
 	return num, t, nil
 }
 
-func getID(msg []byte) (int, *time.Time, error) {
+func getID(msg []byte) (int, int64, error) {
 
 	var data NecessaryFields
 
 	if err := json.Unmarshal(msg, &data); err != nil {
 		log.Errorf("Could not parse response: %s", err.Error())
-		return 0, nil, err
+		return 0, 0, err
 	}
 	if data.ID == "" {
 		log.Warnf("Messsage with empty ID: %s", string(msg))
-		return 0, nil, errors.New("No utc value in request")
+		return 0, 0, errors.New("No utc value in request")
 	}
 	return parseID(data.ID)
 }
@@ -85,7 +90,7 @@ func getJSON(data WatcherData) ([]byte, error) {
 		log.WithCaller(slf.CallerShort).Error(err.Error())
 		return nil, err
 	}
-	log.Debugf("dataJSON=%v", string(dataJSON))
+	//log.Debugf("dataJSON=%v", string(dataJSON))
 
 	//debug mode
 	//os.Exit(1)
