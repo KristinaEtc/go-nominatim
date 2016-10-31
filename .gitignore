@@ -2,10 +2,12 @@ cli/config.json
 cli/main
 cli/test.txt
 cli/test.csv
-cli/main.config
-watcher/watcher.config
+
 watcher/watcher
-watcher/.watcher
+
+*/logs
+*/*.config
+*/.*
 
 *.log
 *.deb
@@ -14,7 +16,6 @@ watcher/.watcher
 .vscode
 
 .go-stomp-nominatim
-
 go-stomp-nominatim
 go-stomp-nominatim.config
 
