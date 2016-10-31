@@ -36,10 +36,10 @@ type GlobalConf struct {
 	ServerPassword      string
 	QueueFormat         string
 	QueueName           string
-	TestFile            string
 	ClientID            string
 	MessageDumpInterval int
 	Heartbeat           int
+	MusicFile           string
 }
 
 // ConfFile is a file with all program options
@@ -57,6 +57,7 @@ var globalOpt = ConfFile{
 		ClientID:            "clientID",
 		MessageDumpInterval: 20,
 		Heartbeat:           30,
+		MusicFile:           "7.aiff",
 	},
 }
 
@@ -143,7 +144,7 @@ func recvMessages() {
 		}
 
 		go alert.PopUpNotify(id)
-		go alert.PlayMusic("7.aiff")
+		go alert.PlayMusic(globalOpt.Global.MusicFile)
 
 		msgCount++
 	}

@@ -1,12 +1,12 @@
 {
   "Global": {
-    "ServerAddr": "mq.tekinsoft.com:61613",
-    "ServerUser": "devclient",
-    "ServerPassword": "jeiko4aila5OifeeDuye",
+    "ServerAddr": "localhost:61614",
+    "ServerUser": "guest",
+    "ServerPassword": "guest",
     "QueueFormat": "/queue/",
     "QueueName": "/topic/alert",
-    "TestFile": "test_small.csv",
-    "ClientID": "myiduuu"
+    "ClientID": "myiduuu",
+    "MusicFile": "7.aiff",
   },
   "Logs": {
     "Handlers": [
