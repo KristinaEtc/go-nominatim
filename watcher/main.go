@@ -8,12 +8,28 @@ import (
 	_ "github.com/KristinaEtc/slflog"
 
 	"github.com/KristinaEtc/config"
+	"github.com/KristinaEtc/go-nominatim/lib/monitoring"
 	"github.com/KristinaEtc/go-nominatim/lib/utils/request"
 	"github.com/go-stomp/stomp"
 	"github.com/ventu-io/slf"
 )
 
 var log = slf.WithContext("watcher.go")
+
+var (
+	// BuildDate - binary build date
+	BuildDate string
+	// GitCommit - git commit hash
+	GitCommit string
+	// GitBranch - git branch name
+	GitBranch string
+	// GitState - working directory state (clean/dirty)
+	GitState string
+	// GitSummary - commit summary
+	GitSummary string
+	// Version - file version
+	Version string
+)
 
 /*-------------------------
   Config option structures
@@ -22,6 +38,7 @@ var log = slf.WithContext("watcher.go")
 var configFile string
 var uuid string
 
+// ServerConf stores all config information about connection
 type ServerConf struct {
 	ServerAddr       string
 	ServerUser       string
@@ -57,22 +74,33 @@ var globalOpt = ConfFile{
 		Heartbeat:        30,
 		RespondFreq:      1,
 	},
-	DirWithUUID: ".go-stomp-nominatim/",
+	DirWithUUID: ".watcher/",
 }
 
 /*-------------------------
   Main process strunctures
 -------------------------*/
 
+// Process is a struct with entities
+// which provide stomp-interaction
 type Process struct {
-	connSend  *stomp.Conn
-	connSubsc *stomp.Conn
-	sub       *stomp.Subscription
-	reqIDs    chan string
+	connSend         *stomp.Conn         //connection for sendind messages
+	connSubsc        *stomp.Conn         //connection for subscribing
+	sub              *stomp.Subscription //subscribtion entity
+	chGotAddrRequest chan string         //a channel for sending message's id
 }
 
-type NecessaryFields struct {
-	ID string `json:"id"`
+// WatcherData stores data, that will be sended to a topic
+type WatcherData struct {
+	*monitoring.MonitoringData
+	IDs               map[int]int64 `json:"response_stat"`
+	ErrTimeOut        int64
+	CurrErrTimeOut    int64
+	CurrErrResponses  int64
+	CurrSuccResponses int64
+	CurrRequests      int64
+	CurrErrorCount    int64
+	CurrLastError     string
 }
 
 var options = []func(*stomp.Conn) error{
@@ -94,13 +122,15 @@ func sendMessages(config ServerConf, pr Process) {
 	for {
 
 		var i int64
+
 		ticker := time.NewTicker(time.Second * time.Duration(config.RequestFreq))
 
 		for t := range ticker.C {
 			reqAddr := request.GenerateAddress()
-			id := fmt.Sprintf("%d,%d", i, t.UnixNano()/1000000)
+			id := fmt.Sprintf("%d,%d", i, t.UTC().Unix())
+
 			i++
-			reqInJSON, err := request.MakeReq(reqAddr, config.ClientID, id)
+			reqInJSON, err := request.MakeReq(reqAddr, uuid, id)
 			if err != nil {
 				log.Errorf("Error parse request parameters: [%v]", err)
 				continue
@@ -111,7 +141,7 @@ func sendMessages(config ServerConf, pr Process) {
 				log.Errorf("Failed to send to server: [%v]", err)
 				continue
 			}
-			pr.reqIDs <- id
+			pr.chGotAddrRequest <- id
 		}
 	}
 }
@@ -121,121 +151,175 @@ func processMessages(config ServerConf, pr Process) {
 		stop <- true
 	}()
 
-	// checking requests: if timeout - increase the err value and delete it
+	data := WatcherData{}
+	data.MonitoringData = monitoring.InitMonitoringData(
+		globalOpt.Server.ServerAddr,
+		Version,
+		uuid,
+		//globalOpt.Server.ClientID,
+		uuid,
+	)
+
+	// checking requests:
+	// if timeout - increase the err value and delete it
 	tickerCheckIDs := time.NewTicker(time.Second * 1)
-	doneCheckIDs := make(chan time.Time)
+	checkIDs := make(chan time.Time)
 
 	go func() {
 		for t := range tickerCheckIDs.C {
-			doneCheckIDs <- t
+			checkIDs <- t
 		}
 	}()
 
 	// sending statistics to spetial topic(s)
 	tickerResp := time.NewTicker(time.Second * 10)
-	doneChanResponse := make(chan time.Time)
+	sendStatusMSg := make(chan time.Time)
 
 	go func() {
 		for t := range tickerResp.C {
-			doneChanResponse <- t
+			sendStatusMSg <- t
 		}
 	}()
 
 	// got answer from subscription
 	// separate goroutine is created, because in direct channel processing
-	// there are no possibility to check error
-	// case msg := sub.C
-	gotAnswerFromSub := make(chan []byte)
-	var errOthers int
-
+	// there are no possibility to check errors
+	chGotAddrResponse := make(chan []byte)
 	go func() {
-
 		for {
 			msg, err := pr.sub.Read()
 			if err != nil {
 				log.Warnf("Error while reading from subcstibtion: %s", err.Error())
-				errOthers++
+				data.ErrorCount++
+				data.CurrErrorCount++
+				data.LastError = err.Error()
+				data.CurrLastError = err.Error()
 				continue
 			}
-			gotAnswerFromSub <- msg.Body
+			chGotAddrResponse <- msg.Body
 		}
 	}()
 
-	var IDs []string
-	var numOfReq, errTimeOut int
+	//--------
+	// select loop
+	// where the whole logic is implemented
+
+	var IDs = make(map[int]int64)
 
 	for {
 		select {
 
-		case msg := <-gotAnswerFromSub:
+		case msg := <-chGotAddrResponse:
 
 			message := string(msg)
-			//if msgCount%globalOpt.Global.MessageDumpInterval == 0 {
-			log.Infof("Got message: %s", message)
-			id, err := parseID(msg)
+			log.Debugf("Address response=[%s]", message)
+
+			num, timeR, err := getID(msg)
 			if err != nil {
 				log.Error(err.Error())
-				errOthers++
-			}
-			exist, key := containsInSlice(IDs, id.ID)
-			if !exist {
-				log.Warnf("Got message with wrong id: [%s]", id.ID)
-				errOthers++
+				data.ErrorCount++
+				data.CurrErrorCount++
+				data.LastError = err.Error()
+				data.CurrLastError = err.Error()
 				continue
 			}
-			IDs = append(IDs[:key], IDs[key+1:]...)
 
-		case id := <-pr.reqIDs:
-			IDs = append(IDs, id)
+			if _, ok := IDs[num]; !ok {
+				log.Warnf("No requests was sended with such id: [%d,%d]", num, timeR)
+				log.Warnf("IDs: [%v]", IDs)
 
-		case t := <-doneCheckIDs:
-			log.Debugf("Ticker ticked %v", t)
+				data.ErrorCount++
+				data.CurrErrorCount++
+				data.LastError = fmt.Sprintf("No requests was sended with such id: [%d,%d]", num, timeR)
+				data.CurrLastError = fmt.Sprintf("No requests was sended with such id: [%d,%d]", num, timeR)
+				continue
+			}
+			delete(IDs, num)
+			data.CurrSuccResponses++
+			data.SuccResp++
 
-			for key, id := range IDs {
-				timeWasSended, err := getTimeFromID(id)
-				if err != nil {
-					log.Errorf("Parsing id: %s", err.Error())
-					errOthers++
-					continue
-				}
+		case id := <-pr.chGotAddrRequest:
+			num, timeR, err := parseID(id)
+			if err != nil {
+				log.Error(err.Error())
+				data.ErrorCount++
+				data.CurrErrorCount++
+				data.LastError = err.Error()
+				data.CurrLastError = err.Error()
+				continue
+			}
+			IDs[num] = timeR
+			data.CurrRequests++
+			data.Reqs++
 
-				duration := time.Since(*timeWasSended)
-				if duration.Seconds() >= 60 {
-					log.Warnf("timeout for %s", id)
-					errTimeOut++
-					IDs = append(IDs[:key], IDs[key+1:]...)
+		case t := <-checkIDs:
+			//log.Debugf("Ticker ticked %v", t)
+
+			for num, timeR := range IDs {
+
+				duration := t.UTC().Unix() - timeR
+				if duration >= 60 {
+					log.Warnf("timeout for: [%d,%d]", num, timeR)
+					data.ErrorCount++
+					data.LastError = fmt.Sprintf("TimeOut for: [%d,%d]", num, timeR)
+					data.ErrTimeOut++
+					data.CurrErrTimeOut++
+					data.CurrLastError = fmt.Sprintf("TimeOut for: [%d,%d]", num, timeR)
+					delete(IDs, num)
 				}
 			}
 
-		case _ = <-doneChanResponse:
+		case _ = <-sendStatusMSg:
 
-			reqInJSON, err := createReqBody(IDs, numOfReq)
+			data.IDs = IDs
+			data.CurrentTime = time.Now().UTC().Format(time.RFC3339)
+			data.Subtype = "watcher"
+			//log.Debugf("data Map=%v", data.IDs)
+
+			reqInJSON, err := getJSON(data)
 			if err != nil {
 				log.Errorf("Failed to create request to server: [%s]", err.Error())
-				errOthers++
+				data.ErrorCount++
+				data.CurrErrorCount++
+				data.LastError = err.Error()
+				data.CurrLastError = err.Error()
 				continue
 			}
 
-			err = pr.connSend.Send(config.MonitoringTopic, "text/json", []byte(*reqInJSON), nil...)
+			log.Debugf("Status Message=%s", reqInJSON)
+
+			err = pr.connSend.Send(config.MonitoringTopic, "text/json", []byte(reqInJSON), nil...)
 			if err != nil {
 				log.Errorf("Failed to send to server: [%s]", err.Error())
-				errOthers++
+				data.ErrorCount++
+				data.CurrErrorCount++
+				data.LastError = err.Error()
+				data.CurrLastError = err.Error()
 				continue
 			}
 
-			if errTimeOut != 0 {
-				err = pr.connSend.Send(config.AlertTopic, "text/json", []byte(*reqInJSON), nil...)
+			if data.CurrErrTimeOut == 0 {
+				log.Debug("Sending alert message...")
+				err = pr.connSend.Send(config.AlertTopic, "text/json", []byte(reqInJSON), nil...)
 				if err != nil {
 					log.Errorf("Failed to send to server: [%s]", err.Error())
-					errOthers++
+					data.ErrorCount++
+					data.CurrErrorCount++
+					data.LastError = err.Error()
+					data.CurrLastError = err.Error()
 					continue
 				}
 			}
 
-			numOfReq = 0
-			errTimeOut = 0
-			errOthers = 0
-			IDs = IDs[:0]
+			data.CurrErrorCount = 0
+			data.CurrErrResponses = 0
+			data.CurrSuccResponses = 0
+			data.CurrErrTimeOut = 0
+			data.CurrLastError = ""
+			data.CurrRequests = 0
+
+			data.IDs = make(map[int]int64)
+			IDs = make(map[int]int64)
 		}
 	}
 }
@@ -280,12 +364,21 @@ func connect(config ServerConf, pr *Process) error {
 
 func main() {
 
+	log.Error("----------------------------------------------")
+
+	log.Infof("BuildDate=%s\n", BuildDate)
+	log.Infof("GitCommit=%s\n", GitCommit)
+	log.Infof("GitBranch=%s\n", GitBranch)
+	log.Infof("GitState=%s\n", GitState)
+	log.Infof("GitSummary=%s\n", GitSummary)
+	log.Infof("VERSION=%s\n", Version)
+
 	config.ReadGlobalConfig(&globalOpt, "watcher options")
 
 	uuid = config.GetUUID(globalOpt.DirWithUUID)
 
 	r := make(chan string, 1)
-	process := Process{reqIDs: r}
+	process := Process{chGotAddrRequest: r}
 
 	log.Info("connecting...")
 	err := connect(globalOpt.Server, &process)

@@ -1,14 +1,17 @@
 {
   "Server": {
+    "Name": "watcher-kristina-note",
+    "MachineID": "watcher-kristina-note",
     "ServerAddr": "localhost:61613",
     "ServerUser": "guest",
     "ServerPassword": "guest",
     "ReplyQueuePrefix": "/queue/",
-    "ReplyQueueName": "/queue/nominatimRequest",
-    "ClientID": "myiduuu",
-    "AlertTopic": "/topic/alerts",
-    "MonitoringTopic": "/topic/global_logs",
-  },
+    "RequestQueueName": "/queue/myRequest",
+    "AlertTopic": "/topic/alerts-1",
+    "MonitoringTopic": "/topic/global_logs-1",
+    "ClientID": "watcher-note",
+    "Req
+   "DirWithUUID": ".go-stomp-nominatim/"
   "Logs": {
     "Handlers": [
       {"Type": "stderr", 
