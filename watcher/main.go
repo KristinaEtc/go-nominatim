@@ -42,7 +42,7 @@ var uuid string
 type ServerConf struct {
 	ServerAddr       string
 	ServerUser       string
-	ServerPassword  send string
+	ServerPassword   string
 	RequestQueueName string
 	ReplyQueuePrefix string
 	AlertTopic       string
