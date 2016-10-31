@@ -284,7 +284,7 @@ func processMessages(config ServerConf, pr Process) {
 			data.Subtype = "watcher"
 
 			//log.Debugf("data Map=%v", data.IDs)
-			data.StartTime = time.Now().Format(time.RFC3339)
+			data.CurrentTime = time.Now().Format(time.RFC3339)
 
 			reqInJSON, err := json.Marshal(data)
 			if err != nil {
