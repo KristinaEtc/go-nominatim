@@ -165,6 +165,9 @@ func processMessages(config ServerConf, pr Process) {
 		uuid,
 	)
 
+	data.LastReconnect = data.StartTime
+	data.LastError = ""
+
 	// checking requests:
 	// if timeout - increase the err value and delete it
 	tickerCheckIDs := time.NewTicker(time.Second * 1)
