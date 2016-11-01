@@ -195,6 +195,8 @@ func processMessages(config ServerConf, pr Process) {
 	chGotAddrResponse := make(chan []byte)
 	go func() {
 		for {
+			time.Sleep(time.Second * 1)
+			log.Debug("go read from sub")
 			msg, err := pr.sub.Read()
 			if err != nil {
 				log.Warnf("Error while reading from subcstibtion: %s", err.Error())
@@ -204,6 +206,7 @@ func processMessages(config ServerConf, pr Process) {
 				data.CurrLastError = err.Error()
 				continue
 			}
+			log.Debug("pr.sub.Read()")
 			chGotAddrResponse <- msg.Body
 		}
 	}()
@@ -218,6 +221,8 @@ func processMessages(config ServerConf, pr Process) {
 		select {
 
 		case msg := <-chGotAddrResponse:
+
+			log.Debug("chGotAddrResponse")
 
 			message := string(msg)
 			log.Debugf("Address response=[%s]", message)
@@ -247,6 +252,7 @@ func processMessages(config ServerConf, pr Process) {
 			data.SuccResp++
 
 		case id := <-pr.chGotAddrRequest:
+			log.Debug("chGotAddrRequest")
 			num, timeR, err := parseID(id)
 			if err != nil {
 				log.Error(err.Error())
@@ -261,7 +267,7 @@ func processMessages(config ServerConf, pr Process) {
 			data.Reqs++
 
 		case t := <-checkIDs:
-			//log.Debugf("Ticker ticked %v", t)
+			log.Debug("CheckIDs")
 
 			for num, timeR := range IDs {
 
@@ -278,6 +284,8 @@ func processMessages(config ServerConf, pr Process) {
 			}
 
 		case _ = <-sendStatusMSg:
+
+			log.Debug("sendStatusMSg")
 
 			data.IDs = IDs
 			data.CurrentTime = time.Now().UTC().Format(time.RFC3339)
@@ -296,7 +304,7 @@ func processMessages(config ServerConf, pr Process) {
 				continue
 			}
 
-			log.Debugf("Status Message=%s", reqInJSON)
+			//log.Debugf("Status Message=%s", reqInJSON)
 
 			err = pr.connSend.Send(config.MonitoringTopic, "application/json", []byte(reqInJSON), nil...)
 			if err != nil {
