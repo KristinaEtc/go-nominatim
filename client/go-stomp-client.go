@@ -194,6 +194,7 @@ func main() {
 	subscribed := make(chan bool)
 
 	config.ReadGlobalConfig(&globalOpt, "go-stomp-client options")
+	uuid = config.GetUUID(globalOpt.DirWithUUID)
 
 	log.Info("starting working...")
 
