@@ -91,6 +91,8 @@ func Connect() (*stomp.Conn, error) {
 		stomp.ConnOpt.Login(globalOpt.Global.ServerUser, globalOpt.Global.ServerPassword),
 		stomp.ConnOpt.Host(globalOpt.Global.ServerAddr),
 		stomp.ConnOpt.HeartBeat(heartbeat, heartbeat),
+		stomp.ConnOpt.Header("wormmq.link.peer_name", globalOpt.Global.Name),
+		stomp.ConnOpt.Header("wormmq.link.peer", uuid),
 	}
 
 	conn, err := stomp.Dial("tcp", globalOpt.Global.ServerAddr, options...)
@@ -141,7 +143,7 @@ func sendMessages() {
 
 		//log.Infof("Request: %s", *reqInJSON)
 
-		err = connSend.Send(globalOpt.Global.QueueName, "text/json", []byte(*reqInJSON), nil...)
+		err = connSend.Send(globalOpt.Global.QueueName, "application/json", []byte(*reqInJSON), nil...)
 		if err != nil {
 			log.Errorf("Failed to send to server: %v", err)
 			continue
