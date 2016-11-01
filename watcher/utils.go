@@ -12,7 +12,8 @@ import (
 // NecessaryFields storesrows of json request, that we want to get
 // and that should necessary be
 type NecessaryFields struct {
-	ID string `json:"id"`
+	ID       string `json:"id"`
+	WorkerID string `json:"MachineID"`
 }
 
 //--------
@@ -39,7 +40,7 @@ func parseUnixTime(s string) (*time.Time, error) {
 
 }
 
-func parseID(id string) (int, int64, error) {
+func parseRequestID(id string) (int, int64, error) {
 	wasSended := strings.SplitAfter(id, ",")
 	if len(wasSended) < 2 {
 		return 0, 0, errors.New("Wrong id: no time parametr")
@@ -66,7 +67,7 @@ func parseID(id string) (int, int64, error) {
 	return num, t, nil
 }
 
-func getID(msg []byte) (int, int64, error) {
+/*func getID(msg []byte) (int, int64, error) {
 
 	var data NecessaryFields
 
@@ -79,4 +80,29 @@ func getID(msg []byte) (int, int64, error) {
 		return 0, 0, errors.New("No utc value in request")
 	}
 	return parseID(data.ID)
+}*/
+
+func parseRequest(msg []byte) (int, int64, string, error) {
+
+	var data NecessaryFields
+
+	if err := json.Unmarshal(msg, &data); err != nil {
+		log.Errorf("Could not parse response: %s", err.Error())
+		return 0, 0, "", err
+	}
+
+	if data.ID == "" && data.WorkerID == "" {
+		log.Warnf("Messsage with empty ID: %s", string(msg))
+		return 0, 0, "", errors.New("No utc value in request")
+	}
+
+	requestID, requestTime, err := parseRequestID(data.ID)
+	if err != nil {
+		log.Warnf("Could not parse requestID: %s", string(msg))
+		return 0, 0, "", errors.New("Could not parse requestID")
+
+	}
+
+	return requestID, requestTime, data.WorkerID, nil
+
 }

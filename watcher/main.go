@@ -16,6 +16,7 @@ import (
 )
 
 var log = slf.WithContext("watcher.go")
+var requestTimeOut int64 = 60
 
 var (
 	// BuildDate - binary build date
@@ -97,14 +98,14 @@ type Process struct {
 // WatcherData stores data, that will be sended to a topic
 type WatcherData struct {
 	*monitoring.MonitoringData
-	IDs               map[int]int64 `json:"response_stat"`
-	ErrTimeOut        int64
-	CurrErrTimeOut    int64
-	CurrErrResponses  int64
-	CurrSuccResponses int64
-	CurrRequests      int64
-	CurrErrorCount    int64
-	CurrLastError     string
+	ResponseDelaysByID map[string]int64 `json:"responseDelaysByID"`
+	ErrTimeOut         int64
+	CurrErrTimeOut     int64
+	CurrErrResponses   int64
+	CurrSuccResponses  int64
+	CurrRequests       int64
+	CurrErrorCount     int64
+	CurrLastError      string
 }
 
 //init in connetc()
@@ -129,7 +130,7 @@ func sendMessages(config ServerConf, pr Process) {
 
 		for t := range ticker.C {
 			reqAddr := request.GenerateAddress()
-			id := fmt.Sprintf("%d,%d", i, t.UTC().Unix())
+			id := fmt.Sprintf("%d,%d", i, t.UTC().UnixNano())
 
 			i++
 			reqInJSON, err := request.MakeReq(reqAddr, globalOpt.Server.ClientID, id)
@@ -137,8 +138,6 @@ func sendMessages(config ServerConf, pr Process) {
 				log.Errorf("Error parse request parameters: [%v]", err)
 				continue
 			}
-
-			log.Debugf("My request %s", *reqInJSON)
 
 			err = pr.connSend.Send(config.RequestQueueName, "application/json", []byte(*reqInJSON), nil...)
 			if err != nil {
@@ -166,24 +165,23 @@ func processMessages(config ServerConf, pr Process) {
 	data.LastReconnect = data.StartTime
 	data.LastError = ""
 
-	// checking requests:
-	// if timeout - increase the err value and delete it
-	tickerCheckIDs := time.NewTicker(time.Second * 1)
-	checkIDs := make(chan time.Time)
+	// checking requests every second
+	tickerCheckRequestsTimeOut := time.NewTicker(time.Second * 1)
+	checkRequestsTimeOut := make(chan time.Time)
 
 	go func() {
-		for t := range tickerCheckIDs.C {
-			checkIDs <- t
+		for t := range tickerCheckRequestsTimeOut.C {
+			checkRequestsTimeOut <- t
 		}
 	}()
 
-	// sending statistics to spetial topic(s)
-	tickerResp := time.NewTicker(time.Second * 10)
-	sendStatusMSg := make(chan time.Time)
+	// sending statistics
+	tickerSendDelayStat := time.NewTicker(time.Second * 10)
+	sendDelayStatus := make(chan time.Time)
 
 	go func() {
-		for t := range tickerResp.C {
-			sendStatusMSg <- t
+		for t := range tickerSendDelayStat.C {
+			sendDelayStatus <- t
 		}
 	}()
 
@@ -194,7 +192,6 @@ func processMessages(config ServerConf, pr Process) {
 	go func() {
 		for {
 			time.Sleep(time.Second * 1)
-			log.Debug("go read from sub")
 			msg, err := pr.sub.Read()
 			if err != nil {
 				log.Warnf("Error while reading from subcstibtion: %s", err.Error())
@@ -204,7 +201,7 @@ func processMessages(config ServerConf, pr Process) {
 				data.CurrLastError = err.Error()
 				continue
 			}
-			log.Debug("pr.sub.Read()")
+			//log.Debug("pr.sub.Read()")
 			chGotAddrResponse <- msg.Body
 		}
 	}()
@@ -213,19 +210,18 @@ func processMessages(config ServerConf, pr Process) {
 	// select loop
 	// where the whole logic is implemented
 
-	var IDs = make(map[int]int64)
+	var timeRequestsByID = make(map[int]int64)
+	var responseDelaysByID = make(map[string]int64)
 
 	for {
 		select {
 
 		case msg := <-chGotAddrResponse:
 
-			log.Debug("chGotAddrResponse")
-
 			message := string(msg)
 			log.Debugf("Address response=[%s]", message)
 
-			num, timeR, err := getID(msg)
+			requestID, requestTime, workerID, err := parseRequest(msg)
 			if err != nil {
 				log.Error(err.Error())
 				data.ErrorCount++
@@ -235,23 +231,29 @@ func processMessages(config ServerConf, pr Process) {
 				continue
 			}
 
-			if _, ok := IDs[num]; !ok {
-				log.Warnf("No requests was sended with such id: [%d,%d]", num, timeR)
-				log.Warnf("IDs: [%v]", IDs)
+			if _, ok := timeRequestsByID[requestID]; !ok {
+				log.Warnf("No requests was sended with such id: [%d,%d]", requestID, requestTime)
+				log.Warnf(" timeRequestsByID: [%v]", timeRequestsByID)
 
 				data.ErrorCount++
 				data.CurrErrorCount++
-				data.LastError = fmt.Sprintf("No requests was sended with such id: [%d,%d]", num, timeR)
-				data.CurrLastError = fmt.Sprintf("No requests was sended with such id: [%d,%d]", num, timeR)
+				data.LastError = fmt.Sprintf("No requests was sended with such id: [%d,%d]", requestID, requestTime)
+				data.CurrLastError = fmt.Sprintf("No requests was sended with such id: [%d,%d]", requestID, requestTime)
 				continue
 			}
-			delete(IDs, num)
+
+			t := time.Now().UTC().UnixNano()
+			log.Debugf("t.UTC().Unix() - timeRequestsByID[requestID]=[%d]", (t-timeRequestsByID[requestID])/1000000)
+			responseDelaysByID[workerID] = (t - timeRequestsByID[requestID]) / 1000000
+
+			delete(timeRequestsByID, requestID)
 			data.CurrSuccResponses++
 			data.SuccResp++
 
 		case id := <-pr.chGotAddrRequest:
-			log.Debug("chGotAddrRequest")
-			num, timeR, err := parseID(id)
+
+			//id is a string with  requestID and requestTime: "id,time"
+			requestID, requestTime, err := parseRequestID(id)
 			if err != nil {
 				log.Error(err.Error())
 				data.ErrorCount++
@@ -260,32 +262,32 @@ func processMessages(config ServerConf, pr Process) {
 				data.CurrLastError = err.Error()
 				continue
 			}
-			IDs[num] = timeR
+			timeRequestsByID[requestID] = requestTime
 			data.CurrRequests++
 			data.Reqs++
 
-		case t := <-checkIDs:
-			log.Debug("CheckIDs")
+		case t := <-checkRequestsTimeOut:
+			//log.Debug("CheckIDs")
 
-			for num, timeR := range IDs {
+			for requestID, requestTime := range timeRequestsByID {
 
-				duration := t.UTC().Unix() - timeR
-				if duration >= 60 {
-					log.Warnf("timeout for: [%d,%d]", num, timeR)
+				delay := (t.UTC().UnixNano() - requestTime) / 1000000
+				if delay >= (requestTimeOut * 1000) {
+					log.Warnf("timeout for: [%d,%d]", requestID, requestTime)
 					data.ErrorCount++
-					data.LastError = fmt.Sprintf("TimeOut for: [%d,%d]", num, timeR)
+					data.LastError = fmt.Sprintf("TimeOut for: [%d,%d]", requestID, requestTime)
 					data.ErrTimeOut++
 					data.CurrErrTimeOut++
-					data.CurrLastError = fmt.Sprintf("TimeOut for: [%d,%d]", num, timeR)
-					delete(IDs, num)
+					data.CurrLastError = fmt.Sprintf("TimeOut for: [%d,%d]", requestID, requestTime)
+					delete(timeRequestsByID, requestID)
 				}
 			}
 
-		case _ = <-sendStatusMSg:
+		case _ = <-sendDelayStatus:
 
-			log.Debug("sendStatusMSg")
+			//log.Debug("sendStatusMSg")
 
-			data.IDs = IDs
+			data.ResponseDelaysByID = responseDelaysByID
 			data.CurrentTime = time.Now().UTC().Format(time.RFC3339)
 			data.Subtype = "watcher"
 
@@ -334,8 +336,8 @@ func processMessages(config ServerConf, pr Process) {
 			data.CurrLastError = ""
 			data.CurrRequests = 0
 
-			data.IDs = make(map[int]int64)
-			IDs = make(map[int]int64)
+			data.ResponseDelaysByID = make(map[string]int64)
+			responseDelaysByID = make(map[string]int64)
 		}
 	}
 }
