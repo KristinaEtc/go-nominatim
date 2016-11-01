@@ -71,6 +71,9 @@ var globalOpt = ConfFile{
 var options = []func(*stomp.Conn) error{
 	stomp.ConnOpt.Login(globalOpt.Global.ServerUser, globalOpt.Global.ServerPassword),
 	stomp.ConnOpt.Host(globalOpt.Global.ServerAddr),
+	//add
+	//stomp.ConnOpt.Header("wormmq.link.peer_name", globalOpt.Server.Name),
+	//stomp.ConnOpt.Header("wormmq.link.peer", uuid),
 }
 
 var (
