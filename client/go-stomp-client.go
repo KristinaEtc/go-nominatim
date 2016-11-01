@@ -128,7 +128,7 @@ func sendMessages() {
 
 		//log.Infof("File line: %s", locs)
 
-		reqInJSON, err := request.MakeReq(locs, globalOpt.Global.ClientID, i)
+		reqInJSON, err := request.MakeReq(locs, globalOpt.Global.ClientID, string(i))
 		//reqInJSON, err := request.MakeReq(locs, clientID, i, log)
 		if err != nil {
 			log.Errorf("Error parse request parameters \"%v\"", err)
