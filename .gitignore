@@ -3,6 +3,9 @@ cli/main
 cli/test.txt
 cli/test.csv
 
+client/go-stomp-client.config
+client/go-stomp-client
+
 watcher/watcher
 notifier/notifier
 
@@ -20,5 +23,5 @@ notifier/notifier
 go-stomp-nominatim
 go-stomp-nominatim.config
 
-
+c
 logs

@@ -34,10 +34,12 @@ testFile    = flag.String("testfile", "test.csv", "testfile with coordinates")
 -------------------------*/
 
 var configFile string
+var uuid string
 
 // GlobalConf is a struct with global options,
 // like server address and queue format, etc.
 type GlobalConf struct {
+	Name                string
 	ServerAddr          string
 	ServerUser          string
 	ServerPassword      string
@@ -51,11 +53,13 @@ type GlobalConf struct {
 
 // ConfFile is a file with all program options
 type ConfFile struct {
-	Global GlobalConf
+	Global      GlobalConf
+	DirWithUUID string
 }
 
 var globalOpt = ConfFile{
 	Global: GlobalConf{
+		Name:                "user",
 		ServerAddr:          "localhost:61614",
 		QueueFormat:         "/queue/",
 		QueueName:           "/queue/nominatimRequest",
@@ -66,14 +70,14 @@ var globalOpt = ConfFile{
 		MessageDumpInterval: 20,
 		Heartbeat:           30,
 	},
+	DirWithUUID: ".client/",
 }
 
 var options = []func(*stomp.Conn) error{
 	stomp.ConnOpt.Login(globalOpt.Global.ServerUser, globalOpt.Global.ServerPassword),
 	stomp.ConnOpt.Host(globalOpt.Global.ServerAddr),
-	//add
-	//stomp.ConnOpt.Header("wormmq.link.peer_name", globalOpt.Server.Name),
-	//stomp.ConnOpt.Header("wormmq.link.peer", uuid),
+	stomp.ConnOpt.Header("wormmq.link.peer_name", globalOpt.Global.Name),
+	stomp.ConnOpt.Header("wormmq.link.peer", uuid),
 }
 
 var (
