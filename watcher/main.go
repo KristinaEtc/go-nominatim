@@ -122,22 +122,23 @@ func sendMessages(config ServerConf, pr Process) {
 	// Every config.RequestFreq seconds function creates a request to a server
 	// with generated address, sends request and sends id of this request
 	// to channel reqIDs, which will be readed in recvMessages function.
+	var i int64
 	for {
-
-		var i int64
 
 		ticker := time.NewTicker(time.Second * time.Duration(config.RequestFreq))
 
 		for t := range ticker.C {
+			i = i + 1
 			reqAddr := request.GenerateAddress()
 			id := fmt.Sprintf("%d,%d", i, t.UTC().UnixNano())
 
-			i++
 			reqInJSON, err := request.MakeReq(reqAddr, globalOpt.Server.ClientID, id)
 			if err != nil {
 				log.Errorf("Error parse request parameters: [%v]", err)
 				continue
 			}
+
+			log.Debugf("Req=%s", *reqInJSON)
 
 			err = pr.connSend.Send(config.RequestQueueName, "application/json", []byte(*reqInJSON), nil...)
 			if err != nil {
@@ -219,7 +220,7 @@ func processMessages(config ServerConf, pr Process) {
 		case msg := <-chGotAddrResponse:
 
 			message := string(msg)
-			log.Debugf("Address response=[%s]", message)
+			log.Debugf("Response=[%s]", message)
 
 			requestID, requestTime, workerID, err := parseRequest(msg)
 			if err != nil {
@@ -233,7 +234,7 @@ func processMessages(config ServerConf, pr Process) {
 
 			if _, ok := timeRequestsByID[requestID]; !ok {
 				log.Warnf("No requests was sended with such id: [%d,%d]", requestID, requestTime)
-				log.Warnf(" timeRequestsByID: [%v]", timeRequestsByID)
+				log.Warnf("timeRequestsByID: [%v]", timeRequestsByID)
 
 				data.ErrorCount++
 				data.CurrErrorCount++
@@ -243,7 +244,7 @@ func processMessages(config ServerConf, pr Process) {
 			}
 
 			t := time.Now().UTC().UnixNano()
-			log.Debugf("t.UTC().Unix() - timeRequestsByID[requestID]=[%d]", (t-timeRequestsByID[requestID])/1000000)
+			//log.Debugf("[%d] t.UTC().Unix() - timeRequestsByID[requestID]=[%d]", requestID, (t-timeRequestsByID[requestID])/1000000)
 			responseDelaysByID[workerID] = (t - timeRequestsByID[requestID]) / 1000000
 
 			delete(timeRequestsByID, requestID)
@@ -272,7 +273,7 @@ func processMessages(config ServerConf, pr Process) {
 			for requestID, requestTime := range timeRequestsByID {
 
 				delay := (t.UTC().UnixNano() - requestTime) / 1000000
-				if delay >= (requestTimeOut * 1000) {
+				if delay >= requestTimeOut*1000 {
 					log.Warnf("timeout for: [%d,%d]", requestID, requestTime)
 					data.ErrorCount++
 					data.LastError = fmt.Sprintf("TimeOut for: [%d,%d]", requestID, requestTime)
@@ -291,7 +292,8 @@ func processMessages(config ServerConf, pr Process) {
 			data.CurrentTime = time.Now().UTC().Format(time.RFC3339)
 			data.Subtype = "watcher"
 
-			//log.Debugf("data Map=%v", data.IDs)
+			//log.Debugf("data Map=%v", data.ResponseDelaysByID)
+			log.Debugf("data Map=%v", timeRequestsByID)
 			data.CurrentTime = time.Now().Format(time.RFC3339)
 
 			reqInJSON, err := json.Marshal(data)
