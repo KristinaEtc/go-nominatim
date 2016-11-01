@@ -37,7 +37,8 @@ var (
 -------------------------*/
 
 var configFile string
-var uuid string
+
+//var uuid string
 
 // ServerConf stores all config information about connection
 type ServerConf struct {
@@ -72,7 +73,7 @@ var globalOpt = ConfFile{
 		RequestQueueName: "/queue/nominatimRequest",
 		AlertTopic:       "/topic/alerts",
 		MonitoringTopic:  "/topic/global_logss",
-		ClientID:         "clientID",
+		ClientID:         "clientUUID",
 		Heartbeat:        30,
 		RespondFreq:      1,
 		Name:             "userName",
@@ -106,12 +107,8 @@ type WatcherData struct {
 	CurrLastError     string
 }
 
-var options = []func(*stomp.Conn) error{
-	stomp.ConnOpt.Login(globalOpt.Server.ServerUser, globalOpt.Server.ServerPassword),
-	stomp.ConnOpt.Host(globalOpt.Server.ServerAddr),
-	stomp.ConnOpt.Header("wormmq.link.peer_name", globalOpt.Server.Name),
-	stomp.ConnOpt.Header("wormmq.link.peer", uuid),
-}
+//init in connetc()
+var options = []func(*stomp.Conn) error{}
 
 var stop = make(chan bool)
 
@@ -135,11 +132,13 @@ func sendMessages(config ServerConf, pr Process) {
 			id := fmt.Sprintf("%d,%d", i, t.UTC().Unix())
 
 			i++
-			reqInJSON, err := request.MakeReq(reqAddr, uuid, id)
+			reqInJSON, err := request.MakeReq(reqAddr, globalOpt.Server.ClientID, id)
 			if err != nil {
 				log.Errorf("Error parse request parameters: [%v]", err)
 				continue
 			}
+
+			log.Debugf("My request %s", *reqInJSON)
 
 			err = pr.connSend.Send(config.RequestQueueName, "application/json", []byte(*reqInJSON), nil...)
 			if err != nil {
@@ -160,9 +159,8 @@ func processMessages(config ServerConf, pr Process) {
 	data.MonitoringData = monitoring.InitMonitoringData(
 		globalOpt.Server.ServerAddr,
 		Version,
-		uuid,
-		//globalOpt.Server.ClientID,
-		uuid,
+		globalOpt.Server.Name,
+		globalOpt.Server.ClientID,
 	)
 
 	data.LastReconnect = data.StartTime
@@ -362,7 +360,8 @@ func connect(config ServerConf, pr *Process) error {
 	options = []func(*stomp.Conn) error{
 		stomp.ConnOpt.Login(config.ServerUser, config.ServerPassword),
 		stomp.ConnOpt.Host(config.ServerAddr),
-		//stomp.ConnOpt.HeartBeat(heartbeat, heartbeat),
+		stomp.ConnOpt.Header("wormmq.link.peer_name", globalOpt.Server.Name),
+		stomp.ConnOpt.Header("wormmq.link.peer", globalOpt.Server.ClientID),
 	}
 
 	var err error
@@ -393,7 +392,7 @@ func main() {
 
 	config.ReadGlobalConfig(&globalOpt, "watcher options")
 
-	uuid = config.GetUUID(globalOpt.DirWithUUID)
+	globalOpt.Server.ClientID = config.GetUUID(globalOpt.DirWithUUID)
 
 	r := make(chan string, 1)
 	process := Process{chGotAddrRequest: r}
