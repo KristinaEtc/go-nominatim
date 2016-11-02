@@ -3,13 +3,18 @@ package request
 import (
 	"encoding/json"
 	"fmt"
+	"math/rand"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/KristinaEtc/go-nominatim/lib"
+	"github.com/ventu-io/slf"
 )
 
 const pwdCurr string = "Nominatim/lib/utils/request"
+
+var log = slf.WithContext("watcher.go")
 
 type Req struct {
 	Nominatim.ReverseGeocodeRequest
@@ -60,5 +65,21 @@ func MakeReq(parameters, clientID string, ID string) (reqInJSON *string, err err
 
 // GenerateAddress generates an address across the Belarus
 func GenerateAddress() string {
-	return "53.8225923,27.277391,18"
+
+	//return "53.8225923,27.277391,18"
+
+	var s1 = rand.NewSource(time.Now().UnixNano())
+	var r1 = rand.New(s1)
+
+	lat := r1.Float64()*5 + 52
+	long := r1.Float64()*9 + 24
+
+	log.Debugf("%f-%f", lat, long)
+
+	latStr := strconv.FormatFloat(lat, 'f', -1, 32)
+	longStr := strconv.FormatFloat(long, 'f', -1, 32)
+
+	address := latStr + "," + longStr + "," + "18"
+
+	return address
 }
