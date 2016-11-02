@@ -14,6 +14,7 @@ import (
 )
 
 var log = slf.WithContext("watcher.go")
+var clientID string
 var requestTimeOut int64 = 60
 
 var (
@@ -48,7 +49,6 @@ type ServerConf struct {
 	ReplyQueuePrefix string
 	AlertTopic       string
 	MonitoringTopic  string
-	ClientID         string
 	Heartbeat        int
 	//	RespondFreq    int
 	RespondFreq int // per minute
@@ -72,7 +72,6 @@ var globalOpt = ConfFile{
 		RequestQueueName: "/queue/nominatimRequest",
 		AlertTopic:       "/topic/alerts",
 		MonitoringTopic:  "/topic/global_logss",
-		ClientID:         "clientUUID",
 		Heartbeat:        30,
 		RespondFreq:      1,
 		Name:             "userName",
@@ -130,7 +129,7 @@ func sendMessages(config ServerConf, pr Process) {
 			reqAddr := request.GenerateAddress()
 			id := fmt.Sprintf("%d,%d", i, t.UTC().UnixNano())
 
-			reqInJSON, err := request.MakeReq(reqAddr, globalOpt.Server.ClientID, id)
+			reqInJSON, err := request.MakeReq(reqAddr, clientID, id)
 			if err != nil {
 				log.Errorf("Error parse request parameters: [%v]", err)
 				continue
@@ -158,7 +157,7 @@ func processMessages(config ServerConf, pr Process) {
 		globalOpt.Server.ServerAddr,
 		Version,
 		globalOpt.Server.Name,
-		globalOpt.Server.ClientID,
+		clientID,
 	)
 
 	data.LastReconnect = data.StartTime
@@ -299,7 +298,7 @@ func processMessages(config ServerConf, pr Process) {
 
 func subscribe(node ServerConf, pr *Process) (err error) {
 
-	queueName := node.ReplyQueuePrefix + node.ClientID
+	queueName := node.ReplyQueuePrefix + clientID
 	log.Debugf("Subscribing to %s", queueName)
 
 	pr.sub, err = pr.connSubsc.Subscribe(queueName, stomp.AckAuto)
@@ -318,7 +317,7 @@ func connect(config ServerConf, pr *Process) error {
 		stomp.ConnOpt.Login(config.ServerUser, config.ServerPassword),
 		stomp.ConnOpt.Host(config.ServerAddr),
 		stomp.ConnOpt.Header("wormmq.link.peer_name", globalOpt.Server.Name),
-		stomp.ConnOpt.Header("wormmq.link.peer", globalOpt.Server.ClientID),
+		stomp.ConnOpt.Header("wormmq.link.peer", clientID),
 	}
 
 	var err error
@@ -349,7 +348,7 @@ func main() {
 
 	config.ReadGlobalConfig(&globalOpt, "watcher options")
 
-	globalOpt.Server.ClientID = config.GetUUID(globalOpt.DirWithUUID)
+	clientID = config.GetUUID(globalOpt.DirWithUUID)
 
 	r := make(chan string, 1)
 	process := Process{chGotAddrRequest: r}
