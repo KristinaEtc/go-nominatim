@@ -45,10 +45,7 @@ func parseID(id string) (int, int64, error) {
 	if len(wasSended) < 2 {
 		return 0, 0, errors.New("Wrong id: no time parametr")
 	}
-	/*t, err := parseUnixTime(wasSended[1])
-	if err != nil {
-		return 0,0, err
-	}*/
+
 	t, err := strconv.ParseInt(wasSended[1], 10, 64)
 	if err != nil {
 		return 0, 0, err
@@ -60,27 +57,9 @@ func parseID(id string) (int, int64, error) {
 	if err != nil {
 		return 0, t, err
 	}
-	//num, err := strconv.Atoi(strings.TrimPrefix(wasSended[0], ","))
-	//if err != nil {
-	//	return 0, t, err
-	//}
+
 	return num, t, nil
 }
-
-/*func getID(msg []byte) (int, int64, error) {
-
-	var data NecessaryFields
-
-	if err := json.Unmarshal(msg, &data); err != nil {
-		log.Errorf("Could not parse response: %s", err.Error())
-		return 0, 0, err
-	}
-	if data.ID == "" {
-		log.Warnf("Messsage with empty ID: %s", string(msg))
-		return 0, 0, errors.New("No utc value in request")
-	}
-	return parseID(data.ID)
-}*/
 
 func parseResponse(msg []byte) (int, int64, string, error) {
 
@@ -124,4 +103,40 @@ func convertFieldNames(m map[string]int64) map[string]int64 {
 		}
 	}
 	return m
+}
+
+func sendMessageDelays(dataDelays *ResponseDelays, dataStatistic *ResponseStatistic, pr Process, topic string) error {
+	reqInJSON, err := json.Marshal(dataDelays)
+	if err != nil {
+		processCommonError(err.Error(), dataStatistic)
+		return err
+	}
+
+	err = pr.connSend.Send(topic, "application/json", []byte(reqInJSON), nil...)
+	if err != nil {
+		processCommonError(err.Error(), dataStatistic)
+		return err
+	}
+	return nil
+}
+
+func sendMessageStatistic(dataDelays *ResponseStatistic, dataStatistic *ResponseStatistic, pr Process, topic string) ([]byte, error) {
+	//dataStatistic.ResponseDelaysByID = convertFieldNames(responseDelaysByID)
+	dataStatistic.CurrentTime = time.Now().UTC().Format(time.RFC3339)
+	dataStatistic.Subtype = "watcher-statictic"
+
+	reqInJSON, err := json.Marshal(dataStatistic)
+	if err != nil {
+		processCommonError(err.Error(), dataStatistic)
+		return nil, err
+	}
+
+	//log.Debugf("Status Message=%s", reqInJSON)
+
+	err = pr.connSend.Send(topic, "application/json", []byte(reqInJSON), nil...)
+	if err != nil {
+		processCommonError(err.Error(), dataStatistic)
+		return nil, err
+	}
+	return reqInJSON, nil
 }

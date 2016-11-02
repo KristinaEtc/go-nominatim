@@ -4,7 +4,7 @@ import (
 	_ "github.com/KristinaEtc/slflog"
 )
 
-func processErrorTimeOut(errMessage string, data *WatcherData) {
+func processErrorTimeOut(errMessage string, data *ResponseStatistic) {
 	data.ErrorCount++
 	data.ErrTimeOut++
 	data.CurrErrTimeOut++
@@ -12,19 +12,19 @@ func processErrorTimeOut(errMessage string, data *WatcherData) {
 	data.CurrLastError = errMessage
 }
 
-func processCommonError(errMessage string, data *WatcherData) {
+func processCommonError(errMessage string, data *ResponseStatistic) {
 	data.ErrorCount++
 	data.CurrErrorCount++
 	data.LastError = errMessage
 	data.CurrLastError = errMessage
 }
 
-func processSuccess(data *WatcherData) {
+func processSuccess(data *ResponseStatistic) {
 	data.CurrSuccResponses++
 	data.SuccResp++
 }
 
-func cleanErrorStat(data *WatcherData) {
+func cleanErrorStat(data *ResponseStatistic) {
 
 	data.CurrErrorCount = 0
 	data.CurrErrResponses = 0
@@ -32,6 +32,9 @@ func cleanErrorStat(data *WatcherData) {
 	data.CurrErrTimeOut = 0
 	data.CurrLastError = ""
 	data.CurrRequests = 0
+}
 
-	data.ResponseDelaysByID = make(map[string]int64)
+func processNewRequest(data *ResponseStatistic) {
+	data.CurrRequests++
+	data.Reqs++
 }

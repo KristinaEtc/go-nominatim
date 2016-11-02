@@ -2,7 +2,6 @@ package main
 
 //important: must execute first; do not move
 import (
-	"encoding/json"
 	"fmt"
 	"time"
 
@@ -92,17 +91,23 @@ type Process struct {
 	chGotAddrRequest chan string         //a channel for sending message's id
 }
 
-// WatcherData stores data, that will be sended to a topic
-type WatcherData struct {
+// ResponseStatistic stores statistics of request's and response's errors
+type ResponseStatistic struct {
 	*monitoring.MonitoringData
-	ResponseDelaysByID map[string]int64 `json:"responseDelaysByID"`
-	ErrTimeOut         int64
-	CurrErrTimeOut     int64
-	CurrErrResponses   int64
-	CurrSuccResponses  int64
-	CurrRequests       int64
-	CurrErrorCount     int64
-	CurrLastError      string
+
+	ErrTimeOut        int64
+	CurrErrTimeOut    int64
+	CurrErrResponses  int64
+	CurrSuccResponses int64
+	CurrRequests      int64
+	CurrErrorCount    int64
+	CurrLastError     string
+}
+
+// ResponseDelays stores map with response, grouped by id
+type ResponseDelays struct {
+	*monitoring.MonitoringData
+	DelaysByID []int64 `json:"delays_by_id"`
 }
 
 //init in connetc()
@@ -147,21 +152,35 @@ func sendMessages(config ServerConf, pr Process) {
 	}
 }
 
-func processMessages(config ServerConf, pr Process) {
-	defer func() {
-		stop <- true
-	}()
-
-	data := WatcherData{}
-	data.MonitoringData = monitoring.InitMonitoringData(
+func initMonitoringStructures() (ResponseStatistic, ResponseDelays) {
+	dataStatistic := ResponseStatistic{}
+	dataStatistic.MonitoringData = monitoring.InitMonitoringData(
 		globalOpt.Server.ServerAddr,
 		Version,
 		globalOpt.Server.Name,
 		clientID,
 	)
 
-	data.LastReconnect = data.StartTime
-	data.LastError = ""
+	dataStatistic.LastReconnect = dataStatistic.StartTime
+	dataStatistic.LastError = ""
+
+	dataDelays := ResponseDelays{}
+	dataDelays.MonitoringData = monitoring.InitMonitoringData(
+		globalOpt.Server.ServerAddr,
+		Version,
+		globalOpt.Server.Name,
+		clientID,
+	)
+
+	return dataStatistic, dataDelays
+}
+
+func processMessages(config ServerConf, pr Process) {
+	defer func() {
+		stop <- true
+	}()
+
+	dataStatistic, dataDelays := initMonitoringStructures()
 
 	// checking requests every second
 	tickerCheckRequestsTimeOut := time.NewTicker(time.Second * 1)
@@ -179,7 +198,7 @@ func processMessages(config ServerConf, pr Process) {
 			msg, err := pr.sub.Read()
 			if err != nil {
 				log.Warnf("Error while reading from subscription: %s", err.Error())
-				processCommonError(err.Error(), &data)
+				processCommonError(err.Error(), &dataStatistic)
 				continue
 			}
 			//log.Debug("pr.sub.Read()")
@@ -192,7 +211,7 @@ func processMessages(config ServerConf, pr Process) {
 	// where the whole logic is implemented
 
 	var timeRequestsByID = make(map[int]int64)
-	var responseDelaysByID = make(map[string]int64)
+	var responseDelaysByID = make(map[string][]int64)
 
 	for {
 		select {
@@ -205,7 +224,7 @@ func processMessages(config ServerConf, pr Process) {
 			requestID, requestTime, workerID, err := parseResponse(msg)
 			if err != nil {
 				log.Error(err.Error())
-				processCommonError(err.Error(), &data)
+				processCommonError(err.Error(), &dataStatistic)
 				continue
 			}
 
@@ -214,16 +233,16 @@ func processMessages(config ServerConf, pr Process) {
 				log.Debugf("timeRequestsByID: [%v]", timeRequestsByID)
 				errMessage := fmt.Sprintf("No requests was sended with such id: [%d,%d]", requestID, requestTime)
 				log.Warnf(errMessage)
-				processCommonError(errMessage, &data)
+				processCommonError(errMessage, &dataStatistic)
 				continue
 			}
 
 			t := time.Now().UTC().UnixNano()
+			responseDelaysByID[workerID] = append(responseDelaysByID[workerID], (t-timeRequest)/1000000)
 			//log.Debugf("[%d] t.UTC().Unix() - timeRequestsByID[requestID]=[%d]", requestID, (t-timeRequestsByID[requestID])/1000000)
-			responseDelaysByID[workerID] = (t - timeRequest) / 1000000
 
 			delete(timeRequestsByID, requestID)
-			processSuccess(&data)
+			processSuccess(&dataStatistic)
 
 		case id := <-pr.chGotAddrRequest:
 
@@ -231,12 +250,11 @@ func processMessages(config ServerConf, pr Process) {
 			requestID, requestTime, err := parseID(id)
 			if err != nil {
 				log.Error(err.Error())
-				processCommonError(err.Error(), &data)
+				processCommonError(err.Error(), &dataStatistic)
 				continue
 			}
 			timeRequestsByID[requestID] = requestTime
-			data.CurrRequests++
-			data.Reqs++
+			processNewRequest(&dataStatistic)
 
 		case t := <-tickerCheckRequestsTimeOut.C:
 			//log.Debug("CheckIDs")
@@ -248,7 +266,7 @@ func processMessages(config ServerConf, pr Process) {
 					log.Warnf("timeout for: [%d,%d]", requestID, requestTime)
 
 					errMessage := fmt.Sprintf("TimeOut for: [%d,%d]", requestID, requestTime)
-					processErrorTimeOut(errMessage, &data)
+					processErrorTimeOut(errMessage, &dataStatistic)
 					delete(timeRequestsByID, requestID)
 				}
 			}
@@ -256,42 +274,42 @@ func processMessages(config ServerConf, pr Process) {
 		case _ = <-tickerSendDelayStat.C:
 
 			//log.Debug("sendStatusMSg")
+			dataDelays.CurrentTime = time.Now().UTC().Format(time.RFC3339)
+			dataStatistic.Subtype = "watcher-delays"
 
-			data.ResponseDelaysByID = convertFieldNames(responseDelaysByID)
-			data.CurrentTime = time.Now().UTC().Format(time.RFC3339)
-			data.Subtype = "watcher"
+			for k, v := range responseDelaysByID {
+				dataDelays.Subsystem = k
+				dataDelays.DelaysByID = v
 
-			//log.Debugf("data Map=%v", data.ResponseDelaysByID)
-			log.Debugf("data Map=%v", timeRequestsByID)
-
-			reqInJSON, err := json.Marshal(data)
-			if err != nil {
-				log.Errorf("Failed to create request to server: [%s]", err.Error())
-				processCommonError(err.Error(), &data)
-				continue
-			}
-
-			//log.Debugf("Status Message=%s", reqInJSON)
-
-			err = pr.connSend.Send(config.MonitoringTopic, "application/json", []byte(reqInJSON), nil...)
-			if err != nil {
-				log.Errorf("Failed to send to server: [%s]", err.Error())
-				processCommonError(err.Error(), &data)
-				continue
-			}
-
-			if data.CurrErrTimeOut != 0 {
-				log.Debug("Sending alert message...")
-				err = pr.connSend.Send(config.AlertTopic, "application/json", []byte(reqInJSON), nil...)
+				err := sendMessageDelays(&dataDelays, &dataStatistic, pr, config.MonitoringTopic)
 				if err != nil {
-					log.Errorf("Failed to send to server: [%s]", err.Error())
-					processCommonError(err.Error(), &data)
+					log.Errorf("Failed to create request to server: [%s]", err.Error())
+					processCommonError(err.Error(), &dataStatistic)
 					continue
 				}
 			}
 
-			cleanErrorStat(&data)
-			responseDelaysByID = make(map[string]int64)
+			//log.Debugf("data Map=%v", timeRequestsByID)
+
+			reqInJSON, err := sendMessageStatistic(&dataStatistic, &dataStatistic, pr, config.MonitoringTopic)
+			if err != nil {
+				log.Errorf("Failed to create request to server: [%s]", err.Error())
+				processCommonError(err.Error(), &dataStatistic)
+				continue
+			}
+
+			if dataStatistic.CurrErrTimeOut != 0 {
+				log.Debug("Sending alert message...")
+				err = pr.connSend.Send(config.AlertTopic, "application/json", reqInJSON, nil...)
+				if err != nil {
+					log.Errorf("Failed to send to server: [%s]", err.Error())
+					processCommonError(err.Error(), &dataStatistic)
+					continue
+				}
+			}
+
+			cleanErrorStat(&dataStatistic)
+			responseDelaysByID = make(map[string][]int64)
 		}
 	}
 }
