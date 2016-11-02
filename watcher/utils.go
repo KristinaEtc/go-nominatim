@@ -40,7 +40,7 @@ func parseUnixTime(s string) (*time.Time, error) {
 
 }
 
-func parseRequestID(id string) (int, int64, error) {
+func parseID(id string) (int, int64, error) {
 	wasSended := strings.SplitAfter(id, ",")
 	if len(wasSended) < 2 {
 		return 0, 0, errors.New("Wrong id: no time parametr")
@@ -82,7 +82,7 @@ func parseRequestID(id string) (int, int64, error) {
 	return parseID(data.ID)
 }*/
 
-func parseRequest(msg []byte) (int, int64, string, error) {
+func parseResponse(msg []byte) (int, int64, string, error) {
 
 	var data NecessaryFields
 
@@ -96,7 +96,7 @@ func parseRequest(msg []byte) (int, int64, string, error) {
 		return 0, 0, "", errors.New("No utc value in request")
 	}
 
-	requestID, requestTime, err := parseRequestID(data.ID)
+	requestID, requestTime, err := parseID(data.ID)
 	if err != nil {
 		log.Warnf("Could not parse requestID: %s", string(msg))
 		return 0, 0, "", errors.New("Could not parse requestID")
@@ -105,4 +105,10 @@ func parseRequest(msg []byte) (int, int64, string, error) {
 
 	return requestID, requestTime, data.WorkerID, nil
 
+}
+
+func incrementValues(values ...*int64) {
+	for _, val := range values {
+		(*val)++
+	}
 }

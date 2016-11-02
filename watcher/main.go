@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"time"
 
-	_ "github.com/KristinaEtc/slflog"
-
 	"github.com/KristinaEtc/config"
 	"github.com/KristinaEtc/go-nominatim/lib/monitoring"
 	"github.com/KristinaEtc/go-nominatim/lib/utils/request"
@@ -168,23 +166,9 @@ func processMessages(config ServerConf, pr Process) {
 
 	// checking requests every second
 	tickerCheckRequestsTimeOut := time.NewTicker(time.Second * 1)
-	checkRequestsTimeOut := make(chan time.Time)
-
-	go func() {
-		for t := range tickerCheckRequestsTimeOut.C {
-			checkRequestsTimeOut <- t
-		}
-	}()
 
 	// sending statistics
 	tickerSendDelayStat := time.NewTicker(time.Second * 10)
-	sendDelayStatus := make(chan time.Time)
-
-	go func() {
-		for t := range tickerSendDelayStat.C {
-			sendDelayStatus <- t
-		}
-	}()
 
 	// got answer from subscription
 	// separate goroutine is created, because in direct channel processing
@@ -192,7 +176,7 @@ func processMessages(config ServerConf, pr Process) {
 	chGotAddrResponse := make(chan []byte)
 	go func() {
 		for {
-			time.Sleep(time.Second * 1)
+			//time.Sleep(time.Second * 1)
 			msg, err := pr.sub.Read()
 			if err != nil {
 				log.Warnf("Error while reading from subcstibtion: %s", err.Error())
@@ -222,24 +206,19 @@ func processMessages(config ServerConf, pr Process) {
 			message := string(msg)
 			log.Debugf("Response=[%s]", message)
 
-			requestID, requestTime, workerID, err := parseRequest(msg)
+			requestID, requestTime, workerID, err := parseResponse(msg)
 			if err != nil {
 				log.Error(err.Error())
-				data.ErrorCount++
-				data.CurrErrorCount++
-				data.LastError = err.Error()
-				data.CurrLastError = err.Error()
+				processCommonError(err.Error(), &data)
 				continue
 			}
 
 			if _, ok := timeRequestsByID[requestID]; !ok {
-				log.Warnf("No requests was sended with such id: [%d,%d]", requestID, requestTime)
-				log.Warnf("timeRequestsByID: [%v]", timeRequestsByID)
+				log.Debugf("timeRequestsByID: [%v]", timeRequestsByID)
 
-				data.ErrorCount++
-				data.CurrErrorCount++
-				data.LastError = fmt.Sprintf("No requests was sended with such id: [%d,%d]", requestID, requestTime)
-				data.CurrLastError = fmt.Sprintf("No requests was sended with such id: [%d,%d]", requestID, requestTime)
+				errMessage := fmt.Sprintf("No requests was sended with such id: [%d,%d]", requestID, requestTime)
+				log.Warnf(errMessage)
+				processCommonError(errMessage, &data)
 				continue
 			}
 
@@ -248,26 +227,22 @@ func processMessages(config ServerConf, pr Process) {
 			responseDelaysByID[workerID] = (t - timeRequestsByID[requestID]) / 1000000
 
 			delete(timeRequestsByID, requestID)
-			data.CurrSuccResponses++
-			data.SuccResp++
+			processSuccess(&data)
 
 		case id := <-pr.chGotAddrRequest:
 
 			//id is a string with  requestID and requestTime: "id,time"
-			requestID, requestTime, err := parseRequestID(id)
+			requestID, requestTime, err := parseID(id)
 			if err != nil {
 				log.Error(err.Error())
-				data.ErrorCount++
-				data.CurrErrorCount++
-				data.LastError = err.Error()
-				data.CurrLastError = err.Error()
+				processCommonError(err.Error(), &data)
 				continue
 			}
 			timeRequestsByID[requestID] = requestTime
 			data.CurrRequests++
 			data.Reqs++
 
-		case t := <-checkRequestsTimeOut:
+		case t := <-tickerCheckRequestsTimeOut.C:
 			//log.Debug("CheckIDs")
 
 			for requestID, requestTime := range timeRequestsByID {
@@ -275,16 +250,14 @@ func processMessages(config ServerConf, pr Process) {
 				delay := (t.UTC().UnixNano() - requestTime) / 1000000
 				if delay >= requestTimeOut*1000 {
 					log.Warnf("timeout for: [%d,%d]", requestID, requestTime)
-					data.ErrorCount++
-					data.LastError = fmt.Sprintf("TimeOut for: [%d,%d]", requestID, requestTime)
-					data.ErrTimeOut++
-					data.CurrErrTimeOut++
-					data.CurrLastError = fmt.Sprintf("TimeOut for: [%d,%d]", requestID, requestTime)
+
+					errMessage := fmt.Sprintf("TimeOut for: [%d,%d]", requestID, requestTime)
+					processErrorTimeOut(errMessage, &data)
 					delete(timeRequestsByID, requestID)
 				}
 			}
 
-		case _ = <-sendDelayStatus:
+		case _ = <-tickerSendDelayStat.C:
 
 			//log.Debug("sendStatusMSg")
 
@@ -294,15 +267,11 @@ func processMessages(config ServerConf, pr Process) {
 
 			//log.Debugf("data Map=%v", data.ResponseDelaysByID)
 			log.Debugf("data Map=%v", timeRequestsByID)
-			data.CurrentTime = time.Now().Format(time.RFC3339)
 
 			reqInJSON, err := json.Marshal(data)
 			if err != nil {
 				log.Errorf("Failed to create request to server: [%s]", err.Error())
-				data.ErrorCount++
-				data.CurrErrorCount++
-				data.LastError = err.Error()
-				data.CurrLastError = err.Error()
+				processCommonError(err.Error(), &data)
 				continue
 			}
 
@@ -311,10 +280,7 @@ func processMessages(config ServerConf, pr Process) {
 			err = pr.connSend.Send(config.MonitoringTopic, "application/json", []byte(reqInJSON), nil...)
 			if err != nil {
 				log.Errorf("Failed to send to server: [%s]", err.Error())
-				data.ErrorCount++
-				data.CurrErrorCount++
-				data.LastError = err.Error()
-				data.CurrLastError = err.Error()
+				processCommonError(err.Error(), &data)
 				continue
 			}
 
@@ -323,22 +289,12 @@ func processMessages(config ServerConf, pr Process) {
 				err = pr.connSend.Send(config.AlertTopic, "application/json", []byte(reqInJSON), nil...)
 				if err != nil {
 					log.Errorf("Failed to send to server: [%s]", err.Error())
-					data.ErrorCount++
-					data.CurrErrorCount++
-					data.LastError = err.Error()
-					data.CurrLastError = err.Error()
+					processCommonError(err.Error(), &data)
 					continue
 				}
 			}
 
-			data.CurrErrorCount = 0
-			data.CurrErrResponses = 0
-			data.CurrSuccResponses = 0
-			data.CurrErrTimeOut = 0
-			data.CurrLastError = ""
-			data.CurrRequests = 0
-
-			data.ResponseDelaysByID = make(map[string]int64)
+			cleanErrorStat(&data)
 			responseDelaysByID = make(map[string]int64)
 		}
 	}
