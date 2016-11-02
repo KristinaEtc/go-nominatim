@@ -112,3 +112,16 @@ func incrementValues(values ...*int64) {
 		(*val)++
 	}
 }
+
+//elastic cant read names with ".". replace dots to "."
+func convertFieldNames(m map[string]int64) map[string]int64 {
+
+	for key, val := range m {
+		if strings.Contains(key, ".") {
+			newKey := strings.Replace(key, ".", "-", -1)
+			m[newKey] = val
+			delete(m, key)
+		}
+	}
+	return m
+}

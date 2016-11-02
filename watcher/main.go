@@ -257,7 +257,7 @@ func processMessages(config ServerConf, pr Process) {
 
 			//log.Debug("sendStatusMSg")
 
-			data.ResponseDelaysByID = responseDelaysByID
+			data.ResponseDelaysByID = convertFieldNames(responseDelaysByID)
 			data.CurrentTime = time.Now().UTC().Format(time.RFC3339)
 			data.Subtype = "watcher"
 
