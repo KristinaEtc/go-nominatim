@@ -179,11 +179,8 @@ func processMessages(config ServerConf, pr Process) {
 			//time.Sleep(time.Second * 1)
 			msg, err := pr.sub.Read()
 			if err != nil {
-				log.Warnf("Error while reading from subcstibtion: %s", err.Error())
-				data.ErrorCount++
-				data.CurrErrorCount++
-				data.LastError = err.Error()
-				data.CurrLastError = err.Error()
+				log.Warnf("Error while reading from subscription: %s", err.Error())
+				processCommonError(err.Error(), &data)
 				continue
 			}
 			//log.Debug("pr.sub.Read()")
