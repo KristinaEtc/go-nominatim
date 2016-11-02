@@ -136,10 +136,10 @@ func sendMessages(config ServerConf, pr Process) {
 
 		for t := range ticker.C {
 			i = i + 1
-			reqAddr := request.GenerateAddress(r1)
+			lat, lon, zoom := request.GenerateAddress(r1)
 			id := fmt.Sprintf("%d,%d", i, t.UTC().UnixNano())
 
-			reqInJSON, err := request.MakeReq(reqAddr, clientID+"-AddressReply", id)
+			reqInJSON, err := request.MakeReqFloat(lat, lon, zoom, clientID+"-AddressReply", id)
 			if err != nil {
 				log.Errorf("Error parse request parameters: [%v]", err)
 				continue
@@ -302,7 +302,6 @@ func processMessages(config ServerConf, pr Process) {
 				processCommonError(err.Error(), &dataStatistic)
 				continue
 			}
-
 			if dataStatistic.CurrErrTimeOut != 0 {
 				log.Debug("Sending alert message...")
 				err = pr.connSend.Send(config.AlertTopic, "application/json", reqInJSON, nil...)

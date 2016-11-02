@@ -6,7 +6,6 @@ import (
 	"math/rand"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/KristinaEtc/go-nominatim/lib"
 	"github.com/ventu-io/slf"
@@ -63,23 +62,29 @@ func MakeReq(parameters, clientID string, ID string) (reqInJSON *string, err err
 	return &jsonReq, nil
 }
 
+//func MakeReqFloat
+func MakeReqFloat(lat, lon float64, zoom int, clientID, ID string) (reqInJSON *string, err error) {
+
+	r := Req{
+		ClientID: clientID,
+		ID:       ID,
+	}
+
+	r.Lat = lat
+	r.Lon = lon
+
+	jsonReq, err := r.getLocationJSON()
+	if err != nil {
+		return nil, err
+	}
+	return &jsonReq, nil
+}
+
 // GenerateAddress generates an address across the Belarus
-func GenerateAddress() string {
+func GenerateAddress(r1 *rand.Rand) (float64, float64, int) {
 
-	//return "53.8225923,27.277391,18"
+	lat := r1.Float64()*4 + 54
+	lon := r1.Float64()*8 + 26
 
-	var s1 = rand.NewSource(time.Now().UnixNano())
-	var r1 = rand.New(s1)
-
-	lat := r1.Float64()*5 + 52
-	long := r1.Float64()*9 + 24
-
-	log.Debugf("%f-%f", lat, long)
-
-	latStr := strconv.FormatFloat(lat, 'f', -1, 32)
-	longStr := strconv.FormatFloat(long, 'f', -1, 32)
-
-	address := latStr + "," + longStr + "," + "18"
-
-	return address
+	return lat, lon, 18
 }
