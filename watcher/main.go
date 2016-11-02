@@ -298,7 +298,7 @@ func processMessages(config ServerConf, pr Process) {
 
 func subscribe(node ServerConf, pr *Process) (err error) {
 
-	queueName := node.ReplyQueuePrefix + clientID
+	queueName := node.ReplyQueuePrefix + clientID + "-AddressReply"
 	log.Debugf("Subscribing to %s", queueName)
 
 	pr.sub, err = pr.connSubsc.Subscribe(queueName, stomp.AckAuto)
