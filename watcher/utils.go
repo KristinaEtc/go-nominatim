@@ -117,6 +117,9 @@ func sendMessageDelays(dataDelays *ResponseDelays, dataStatistic *ResponseStatis
 		processCommonError(err.Error(), dataStatistic)
 		return err
 	}
+
+	log.Debugf("Delay Message=%s", reqInJSON)
+
 	return nil
 }
 
@@ -131,7 +134,7 @@ func sendMessageStatistic(dataDelays *ResponseStatistic, dataStatistic *Response
 		return nil, err
 	}
 
-	//log.Debugf("Status Message=%s", reqInJSON)
+	log.Debugf("Status Message=%s", reqInJSON)
 
 	err = pr.connSend.Send(topic, "application/json", []byte(reqInJSON), nil...)
 	if err != nil {

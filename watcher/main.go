@@ -3,6 +3,7 @@ package main
 //important: must execute first; do not move
 import (
 	"fmt"
+	"math/rand"
 	"time"
 
 	"github.com/KristinaEtc/config"
@@ -110,6 +111,10 @@ type ResponseDelays struct {
 	DelaysByID []int64 `json:"delays_by_id"`
 }
 
+//for generating address to nominatim
+var s1 = rand.NewSource(time.Now().UnixNano())
+var r1 = rand.New(s1)
+
 //init in connetc()
 var options = []func(*stomp.Conn) error{}
 
@@ -131,7 +136,7 @@ func sendMessages(config ServerConf, pr Process) {
 
 		for t := range ticker.C {
 			i = i + 1
-			reqAddr := request.GenerateAddress()
+			reqAddr := request.GenerateAddress(r1)
 			id := fmt.Sprintf("%d,%d", i, t.UTC().UnixNano())
 
 			reqInJSON, err := request.MakeReq(reqAddr, clientID+"-AddressReply", id)
@@ -140,7 +145,7 @@ func sendMessages(config ServerConf, pr Process) {
 				continue
 			}
 
-			log.Debugf("Req=%s", *reqInJSON)
+			//log.Debugf("Req=%s", *reqInJSON)
 
 			err = pr.connSend.Send(config.RequestQueueName, "application/json", []byte(*reqInJSON), nil...)
 			if err != nil {
@@ -218,8 +223,8 @@ func processMessages(config ServerConf, pr Process) {
 
 		case msg := <-chGotAddrResponse:
 
-			message := string(msg)
-			log.Debugf("Res=[%s]", message)
+			//message := string(msg)
+			//log.Debugf("Res=[%s]", message)
 
 			requestID, requestTime, workerID, err := parseResponse(msg)
 			if err != nil {
