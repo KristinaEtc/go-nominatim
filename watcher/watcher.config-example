@@ -1,7 +1,6 @@
 {
   "Server": {
     "Name": "watcher-example",
-    "MachineID": "watcher-id,
     "ServerAddr": "localhost:61613",
     "ServerUser": "guest",
     "ServerPassword": "guest",
