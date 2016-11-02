@@ -210,9 +210,9 @@ func processMessages(config ServerConf, pr Process) {
 				continue
 			}
 
-			if _, ok := timeRequestsByID[requestID]; !ok {
+			timeRequest, ok := timeRequestsByID[requestID]
+			if !ok {
 				log.Debugf("timeRequestsByID: [%v]", timeRequestsByID)
-
 				errMessage := fmt.Sprintf("No requests was sended with such id: [%d,%d]", requestID, requestTime)
 				log.Warnf(errMessage)
 				processCommonError(errMessage, &data)
@@ -221,7 +221,7 @@ func processMessages(config ServerConf, pr Process) {
 
 			t := time.Now().UTC().UnixNano()
 			//log.Debugf("[%d] t.UTC().Unix() - timeRequestsByID[requestID]=[%d]", requestID, (t-timeRequestsByID[requestID])/1000000)
-			responseDelaysByID[workerID] = (t - timeRequestsByID[requestID]) / 1000000
+			responseDelaysByID[workerID] = (t - timeRequest) / 1000000
 
 			delete(timeRequestsByID, requestID)
 			processSuccess(&data)
