@@ -134,7 +134,7 @@ func sendMessages(config ServerConf, pr Process) {
 			reqAddr := request.GenerateAddress()
 			id := fmt.Sprintf("%d,%d", i, t.UTC().UnixNano())
 
-			reqInJSON, err := request.MakeReq(reqAddr, clientID, id)
+			reqInJSON, err := request.MakeReq(reqAddr, clientID+"-AddressReply", id)
 			if err != nil {
 				log.Errorf("Error parse request parameters: [%v]", err)
 				continue
@@ -169,7 +169,7 @@ func initMonitoringStructures() (ResponseStatistic, ResponseDelays) {
 		globalOpt.Server.ServerAddr,
 		Version,
 		globalOpt.Server.Name,
-		clientID,
+		clientID+"-AddressReply",
 	)
 
 	return dataStatistic, dataDelays
@@ -219,7 +219,7 @@ func processMessages(config ServerConf, pr Process) {
 		case msg := <-chGotAddrResponse:
 
 			message := string(msg)
-			log.Debugf("Response=[%s]", message)
+			log.Debugf("Res=[%s]", message)
 
 			requestID, requestTime, workerID, err := parseResponse(msg)
 			if err != nil {
