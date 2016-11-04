@@ -14,7 +14,7 @@ import (
 )
 
 var log = slf.WithContext("watcher.go")
-var clientID string
+var nodeID string
 var requestTimeOut int64 = 60
 
 var (
@@ -120,6 +120,10 @@ var options = []func(*stomp.Conn) error{}
 
 var stop = make(chan bool)
 
+func getClientID() string {
+	return nodeID + "_AddressReply"
+}
+
 func sendMessages(config ServerConf, pr Process) {
 
 	defer func() {
@@ -139,7 +143,7 @@ func sendMessages(config ServerConf, pr Process) {
 			lat, lon, zoom := request.GenerateAddress(r1)
 			id := fmt.Sprintf("%d,%d", i, t.UTC().UnixNano())
 
-			reqInJSON, err := request.MakeReqFloat(lat, lon, zoom, clientID+"-AddressReply", id)
+			reqInJSON, err := request.MakeReqFloat(lat, lon, zoom, getClientID(), id)
 			if err != nil {
 				log.Errorf("Error parse request parameters: [%v]", err)
 				continue
@@ -163,7 +167,7 @@ func initMonitoringStructures() (ResponseStatistic, ResponseDelays) {
 		globalOpt.Server.ServerAddr,
 		Version,
 		globalOpt.Server.Name,
-		clientID,
+		nodeID,
 	)
 
 	dataStatistic.LastReconnect = dataStatistic.StartTime
@@ -174,7 +178,7 @@ func initMonitoringStructures() (ResponseStatistic, ResponseDelays) {
 		globalOpt.Server.ServerAddr,
 		Version,
 		globalOpt.Server.Name,
-		clientID+"-AddressReply",
+		nodeID,
 	)
 
 	return dataStatistic, dataDelays
@@ -320,7 +324,7 @@ func processMessages(config ServerConf, pr Process) {
 
 func subscribe(node ServerConf, pr *Process) (err error) {
 
-	queueName := node.ReplyQueuePrefix + clientID + "-AddressReply"
+	queueName := node.ReplyQueuePrefix + getClientID()
 	log.Debugf("Subscribing to %s", queueName)
 
 	pr.sub, err = pr.connSubsc.Subscribe(queueName, stomp.AckAuto)
@@ -339,7 +343,7 @@ func connect(config ServerConf, pr *Process) error {
 		stomp.ConnOpt.Login(config.ServerUser, config.ServerPassword),
 		stomp.ConnOpt.Host(config.ServerAddr),
 		stomp.ConnOpt.Header("wormmq.link.peer_name", globalOpt.Server.Name),
-		stomp.ConnOpt.Header("wormmq.link.peer", clientID),
+		stomp.ConnOpt.Header("wormmq.link.peer", nodeID),
 	}
 
 	var err error
@@ -370,7 +374,7 @@ func main() {
 
 	config.ReadGlobalConfig(&globalOpt, "watcher options")
 
-	clientID = config.GetUUID(globalOpt.DirWithUUID)
+	nodeID = config.GetUUID(globalOpt.DirWithUUID)
 
 	r := make(chan string, 1)
 	process := Process{chGotAddrRequest: r}
