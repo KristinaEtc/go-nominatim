@@ -2,87 +2,76 @@ package Nominatim
 
 import (
 	"database/sql"
-	//"fmt"
+
 	_ "github.com/lib/pq"
 	"github.com/ventu-io/slf"
-	//"strconv"
+
 	"errors"
 )
 
-type ReverseGeocode struct {
-	fLat     float64
-	fLon     float64
-	iMaxRank int
-	//aLangPreOrder
-	addressDetails bool
-	db             *sql.DB
+type reverseGeocodeImpl struct {
+	db *sql.DB
 }
 
-type DataWithoutDetails struct {
-	Place_id    string
-	Osm_type    string
-	Osm_id      string
+/*type DataWithoutDetails struct {
+	PlaceID     string
+	OsmType     string
+	OsmID       string
 	Lat         string
 	Lon         string
 	Langaddress string
-	ID          int
+	ID          interface{}
+	//dataProc    string
+	MachineID string
+	TimeReq   string
+	FullReq   interface{}
 }
 
 func (d DataWithoutDetails) String() string {
-	var str = "\nplace_id: " + d.Place_id +
-		"\nosm_id: " + d.Osm_id +
-		"\nosm_type: " + d.Osm_type +
+	var str = "\nplace_id: " + d.PlaceID +
+		"\nosm_id: " + d.OsmID +
+		"\nosm_type: " + d.OsmType +
 		"\nlat: " + d.Lat +
 		"\nlon: " + d.Lon +
-		"\nlangaddress: " + d.Langaddress + "\n"
+		"\nlangaddress: " + d.Langaddress +
+		"\nmachineID: " + d.MachineID +
+		//	"\nfullReq: " + d.FullReq.(string) +
+		"\ntimeReq: " + d.TimeReq + "\n"
 	return str
-}
+}*/
 
-func dataMapToStruct(m map[string]string) *DataWithoutDetails {
-	dataStr := DataWithoutDetails{Place_id: m["place_id"],
-		Osm_id:      m["osm_id"],
-		Osm_type:    m["osm_type"],
-		Lat:         m["lat"],
-		Lon:         m["lon"],
-		Langaddress: m["langaddress"],
-	}
-	return &dataStr
-}
+//NewReverseGeocode - create working ReverseGeocode implemenation, using nominatim db
+func NewReverseGeocode(sqlOpenStr string) (ReverseGeocode, error) {
 
-func NewReverseGeocode(sqlOpenStr string) (*ReverseGeocode, error) {
+	log.Debugf("NewReverseGeocode %s", sqlOpenStr)
 
 	db, err := sql.Open("postgres", sqlOpenStr)
 	if err != nil {
+		log.Errorf("sql.Open error %s %v", sqlOpenStr, err)
 		return nil, err
 	}
-	r := ReverseGeocode{db: db}
-	//log.Println(r.db)
+
+	var tmp int
+	err = db.QueryRow("SELECT 1").Scan(&tmp)
+	if err != nil {
+		log.Errorf("db.QueryRow %v", err)
+		return nil, err
+	}
+
+	r := reverseGeocodeImpl{db: db}
 	return &r, nil
 }
 
-func (r *ReverseGeocode) Close() {
-	r.db.Close()
+func (r *reverseGeocodeImpl) Close() error {
+	err := r.db.Close()
+	if err != nil {
+		log.Errorf("Close: error %s", err.Error())
+		return err
+	}
+	return nil
 }
 
-func (r *ReverseGeocode) SetLocation(fLat, fLon float64) {
-	r.fLat = fLat
-	r.fLon = fLon
-	//log.Printf(fla, ...)
-}
-
-func (r *ReverseGeocode) SetLanguagePreference() {
-	log.Debug("set language pref")
-}
-
-func (r *ReverseGeocode) SetRank(iRank int) {
-	r.iMaxRank = iRank
-}
-
-func (r *ReverseGeocode) SetIncludeAddressDetails(addressDetails bool) {
-	r.addressDetails = addressDetails
-}
-
-func (r *ReverseGeocode) SetZoom(iZoom int) {
+func zoomToRank(iZoom int) int {
 	aZoomRank := map[int]int{
 		0:  2,
 		1:  2,
@@ -106,17 +95,30 @@ func (r *ReverseGeocode) SetZoom(iZoom int) {
 		19: 30,
 	}
 
-	r.iMaxRank = 28
 	if value, ok := aZoomRank[iZoom]; ok {
-		r.iMaxRank = value
+		return value
 	}
+	return 28
 
 	/*if r.iMaxRank = 28; aZoomRank[iZoom] {
 		r.iMaxRank = aZoomRank[iZoom]
 	}*/
 }
 
-func (r *ReverseGeocode) Lookup() (*DataWithoutDetails, error) {
+func parsePlaceDataMap(m map[string]string) *ReverseGeocodeResponse {
+	//TODO: fix types - use float/int64/etc instead of string
+	return &ReverseGeocodeResponse{
+		PlaceID:     m["place_id"],
+		OsmID:       m["osm_id"],
+		OsmType:     m["osm_type"],
+		Lat:         m["lat"],
+		Lon:         m["lon"],
+		Langaddress: m["langaddress"],
+	}
+}
+
+func (r *reverseGeocodeImpl) Lookup(request *ReverseGeocodeRequest) (*ReverseGeocodeResponse, error) {
+
 	//sLon := strconv.FormatFloat(r.fLon, 'f', 6, 64)
 	//sLat := strconv.FormatFloat(r.fLat, 'f', 6, 64)
 
@@ -125,7 +127,7 @@ func (r *ReverseGeocode) Lookup() (*DataWithoutDetails, error) {
 	//var sPointSQL string = "ok"
 
 	var (
-		iMaxRank         = r.iMaxRank
+		iMaxRank         = zoomToRank(request.Zoom)
 		fSearchDiam      = 0.0004
 		fMaxAreaDistance = 1.0
 	)
@@ -184,7 +186,7 @@ func (r *ReverseGeocode) Lookup() (*DataWithoutDetails, error) {
 			`
 
 		//log.Printf("%f %f %f %d", r.fLon, r.fLat, fSearchDiam, iMaxRank)
-		err := r.db.QueryRow(sSQL, r.fLon, r.fLat, fSearchDiam, iMaxRank).Scan(&iPlaceID, &iParentPlace, &iRank)
+		err := r.db.QueryRow(sSQL, request.Lon, request.Lat, fSearchDiam, iMaxRank).Scan(&iPlaceID, &iParentPlace, &iRank)
 		switch {
 		case err == sql.ErrNoRows:
 			//log.Printf("Not found.")
@@ -204,7 +206,7 @@ func (r *ReverseGeocode) Lookup() (*DataWithoutDetails, error) {
 	if iPlaceID.Valid && iMaxRank < 28 {
 		if iRank > 28 && iParentPlace.Valid {
 			iPlaceID = iParentPlace
-			log.Debugf("use parent place: %d", iParentPlace)
+			//log.Debugf("use parent place: %v", iParentPlace)
 		}
 
 		sSQL = `select address_place_id
@@ -224,18 +226,18 @@ func (r *ReverseGeocode) Lookup() (*DataWithoutDetails, error) {
 			if iNewPlaceID.Valid {
 				iPlaceID = iNewPlaceID
 			}
-
 		}
 	}
 
 	if iPlaceID.Valid {
 		placeLookup := NewPlaceLookup(r.db)
 		//placeLookup.SetLanguagePreference()
-		placeLookup.SetIncludeAddressDetails(r.addressDetails)
+		placeLookup.SetIncludeAddressDetails(request.IncludeDetails)
 		placeLookup.SetPlaceID(iPlaceID.Int64)
 		dataMap := placeLookup.Lookup()
-		return dataMapToStruct(dataMap), nil
-	} else {
-		return nil, errors.New("place not found")
+		return parsePlaceDataMap(dataMap), nil
+		//return dataMapToStruct(dataMap, r.machineID, resentFullReq, r.fullReq), nil
 	}
+
+	return nil, errors.New("place not found")
 }

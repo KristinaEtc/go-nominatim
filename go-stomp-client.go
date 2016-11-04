@@ -1,17 +1,18 @@
 package main
 
 //important: must execute first; do not move
-import _ "github.com/KristinaEtc/slflog"
-
 import (
+	"time"
+
+	"github.com/KristinaEtc/config"
 	"github.com/KristinaEtc/go-nominatim/lib/utils/fileproc"
 	"github.com/KristinaEtc/go-nominatim/lib/utils/request"
 	_ "github.com/KristinaEtc/slflog"
-	//	u "github.com/KristinaEtc/utils"
-	"github.com/KristinaEtc/config"
 	"github.com/go-stomp/stomp"
 	"github.com/ventu-io/slf"
 )
+
+//  u "github.com/KristinaEtc/utils"
 
 const (
 	defaultPort = ":61614"
@@ -29,52 +30,78 @@ testFile    = flag.String("testfile", "test.csv", "testfile with coordinates")
 */
 
 /*-------------------------
-	Config option structures
+  Config option structures
 -------------------------*/
 
 var configFile string
+var uuid string
 
 // GlobalConf is a struct with global options,
 // like server address and queue format, etc.
 type GlobalConf struct {
+	Name                string
 	ServerAddr          string
 	ServerUser          string
 	ServerPassword      string
 	QueueFormat         string
 	QueueName           string
-	DestinQueue         string
 	TestFile            string
 	ClientID            string
 	MessageDumpInterval int
+	Heartbeat           int
 }
 
 // ConfFile is a file with all program options
 type ConfFile struct {
-	Global GlobalConf
+	Global      GlobalConf
+	DirWithUUID string
 }
 
 var globalOpt = ConfFile{
 	Global: GlobalConf{
+		Name:                "user",
 		ServerAddr:          "localhost:61614",
 		QueueFormat:         "/queue/",
 		QueueName:           "/queue/nominatimRequest",
 		ServerUser:          "",
 		ServerPassword:      "",
 		TestFile:            "test.csv",
-		DestinQueue:         "/queue/nominatimRequest",
 		ClientID:            "clientID",
 		MessageDumpInterval: 20,
+		Heartbeat:           30,
 	},
+	DirWithUUID: ".client/",
 }
 
 var options = []func(*stomp.Conn) error{
 	stomp.ConnOpt.Login(globalOpt.Global.ServerUser, globalOpt.Global.ServerPassword),
 	stomp.ConnOpt.Host(globalOpt.Global.ServerAddr),
+	stomp.ConnOpt.Header("wormmq.link.peer_name", globalOpt.Global.Name),
+	stomp.ConnOpt.Header("wormmq.link.peer", uuid),
 }
 
 var (
 	stop = make(chan bool)
 )
+
+func Connect() (*stomp.Conn, error) {
+	heartbeat := time.Duration(globalOpt.Global.Heartbeat) * time.Second
+
+	options = []func(*stomp.Conn) error{
+		stomp.ConnOpt.Login(globalOpt.Global.ServerUser, globalOpt.Global.ServerPassword),
+		stomp.ConnOpt.Host(globalOpt.Global.ServerAddr),
+		stomp.ConnOpt.HeartBeat(heartbeat, heartbeat),
+		stomp.ConnOpt.Header("wormmq.link.peer_name", globalOpt.Global.Name),
+		stomp.ConnOpt.Header("wormmq.link.peer", uuid),
+	}
+
+	conn, err := stomp.Dial("tcp", globalOpt.Global.ServerAddr, options...)
+	if err != nil {
+		log.Errorf("cannot connect to server %v", err.Error())
+		return nil, err
+	}
+	return conn, nil
+}
 
 func sendMessages() {
 	defer func() {
@@ -86,20 +113,8 @@ func sendMessages() {
 		return
 	}
 
-	options = []func(*stomp.Conn) error{
-		stomp.ConnOpt.Login(globalOpt.Global.ServerUser, globalOpt.Global.ServerPassword),
-		stomp.ConnOpt.Host(globalOpt.Global.ServerAddr),
-	}
-
-	_, err := stomp.Dial("tcp", globalOpt.Global.ServerAddr, options...)
+	connSend, err := Connect()
 	if err != nil {
-		log.Errorf("cannot connect to server %v", err.Error())
-		return
-	}
-
-	connSend, err := stomp.Dial("tcp", globalOpt.Global.ServerAddr, options...)
-	if err != nil {
-		log.Errorf("cannot connect to server %v", err.Error())
 		return
 	}
 
@@ -117,21 +132,21 @@ func sendMessages() {
 		/*if fileNotFinished := fs.Scanner.Scan(); fileNotFinished == true {*/
 		locs := fs.Scanner.Text()
 
-		log.Debugf("locs: %s", locs)
+		//log.Infof("File line: %s", locs)
 
-		reqInJSON, err := request.MakeReq(locs, globalOpt.Global.ClientID, i)
+		reqInJSON, err := request.MakeReq(locs, globalOpt.Global.ClientID, string(i))
 		//reqInJSON, err := request.MakeReq(locs, clientID, i, log)
 		if err != nil {
-			log.Error("Could not get coordinates in JSON: wrong format")
+			log.Errorf("Error parse request parameters \"%v\"", err)
 			continue
 		}
 
-		log.Debugf("reqInJSON: %s", *reqInJSON)
+		//log.Infof("Request: %s", *reqInJSON)
 
-		err = connSend.Send(globalOpt.Global.DestinQueue, "text/json", []byte(*reqInJSON), nil...)
+		err = connSend.Send(globalOpt.Global.QueueName, "application/json", []byte(*reqInJSON), nil...)
 		if err != nil {
 			log.Errorf("Failed to send to server: %v", err)
-			return
+			continue
 		}
 		i++
 	}
@@ -142,14 +157,8 @@ func recvMessages(subscribed chan bool) {
 		stop <- true
 	}()
 
-	options = []func(*stomp.Conn) error{
-		stomp.ConnOpt.Login(globalOpt.Global.ServerUser, globalOpt.Global.ServerPassword),
-		stomp.ConnOpt.Host(globalOpt.Global.ServerAddr),
-	}
-
-	conn, err := stomp.Dial("tcp", globalOpt.Global.ServerAddr, options...)
+	conn, err := Connect()
 	if err != nil {
-		log.Errorf("Cannot connect to server: %v", err.Error())
 		return
 	}
 
@@ -165,16 +174,19 @@ func recvMessages(subscribed chan bool) {
 
 	var msgCount = 0
 	for {
-		msg := <-sub.C
-		if msg == nil {
-			log.Warn("Got empty message; ignore")
+
+		msg, err := sub.Read()
+		if err != nil {
+			//log.Warn("Got empty message; ignore")
+			time.Sleep(time.Second)
 			continue
 		}
-
+		time.Sleep(time.Second)
 		message := string(msg.Body)
-		if msgCount%globalOpt.Global.MessageDumpInterval == 0 {
-			log.Infof("Got message: %s", message)
-		}
+		//if msgCount%globalOpt.Global.MessageDumpInterval == 0 {
+		log.Infof("Got message: %s", message)
+		time.Sleep(time.Second)
+		//}
 		msgCount++
 	}
 }
@@ -184,6 +196,7 @@ func main() {
 	subscribed := make(chan bool)
 
 	config.ReadGlobalConfig(&globalOpt, "go-stomp-client options")
+	uuid = config.GetUUID(globalOpt.DirWithUUID)
 
 	log.Info("starting working...")
 

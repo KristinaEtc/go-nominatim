@@ -2,17 +2,26 @@ cli/config.json
 cli/main
 cli/test.txt
 cli/test.csv
-worker/logfile*
-worker/nsqd/test-client
-worker/nsqd/worker
+
+client/go-stomp-client.config
+client/go-stomp-client
+
+watcher/watcher
+notifier/notifier
+
+*/logs
+*/*.config
+*/.*
+
 *.log
-worker/stomp/go-stomp-nominatim/go-stomp-nominatim
-worker/stomp/go-stomp-client/go-stomp-client
 *.deb
 *.exe
 
-log
-go-deb
-
 .vscode
 
+.go-stomp-nominatim
+go-stomp-nominatim
+go-stomp-nominatim.config
+
+c
+logs
