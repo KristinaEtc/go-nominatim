@@ -72,7 +72,7 @@ func InitMonitoringData(machineAddr, version, name, uuid string) *MonitoringData
 		ID:   uuid,
 		Name: name,
 
-		Subtype:      "worker",
+		Subtype:      "",
 		Subsystem:    "",
 		ComputerName: hostname,
 		UserName:     fmt.Sprintf("%d", os.Getuid()),
