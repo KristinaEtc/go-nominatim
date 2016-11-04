@@ -134,12 +134,6 @@ var options = []func(*stomp.Conn) error{
 	stomp.ConnOpt.Host("127.0.0.1"),
 }
 
-// ErrorResponse - struct for error answer to geocoding request
-type ErrorResponse struct {
-	Type    string
-	Message string
-}
-
 //--------------------------------------------------------------------------
 
 func main() {
