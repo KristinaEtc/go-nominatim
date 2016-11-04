@@ -286,7 +286,7 @@ func processMessages(config ServerConf, pr Process) {
 
 			//log.Debug("sendStatusMSg")
 			dataDelays.CurrentTime = time.Now().UTC().Format(time.RFC3339)
-			dataStatistic.Subtype = "watcher-delays"
+			dataDelays.Subtype = "watcher-delays"
 
 			for k, v := range responseDelaysByID {
 				dataDelays.Subsystem = k
