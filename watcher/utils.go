@@ -126,7 +126,7 @@ func sendMessageDelays(dataDelays *ResponseDelays, dataStatistic *ResponseStatis
 func sendMessageStatistic(dataDelays *ResponseStatistic, dataStatistic *ResponseStatistic, pr Process, topic string) ([]byte, error) {
 	//dataStatistic.ResponseDelaysByID = convertFieldNames(responseDelaysByID)
 	dataStatistic.CurrentTime = time.Now().UTC().Format(time.RFC3339)
-	dataStatistic.Subtype = "watcher-statictic"
+	dataStatistic.Subtype = "watcher-statistic"
 
 	reqInJSON, err := json.Marshal(dataStatistic)
 	if err != nil {
