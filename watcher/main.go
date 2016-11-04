@@ -180,6 +180,8 @@ func initMonitoringStructures() (ResponseStatistic, ResponseDelays) {
 		globalOpt.Server.Name,
 		nodeID,
 	)
+	dataDelays.LastReconnect = dataStatistic.StartTime
+	dataDelays.LastError = ""
 
 	return dataStatistic, dataDelays
 }
