@@ -336,14 +336,3 @@ func runProcessLoop(reverseGeocode Nominatim.ReverseGeocode, subscribed chan boo
 		data.AverageRate = (1-globalOpt.DiagnConf.CoeffEMA)*data.AverageRate + globalOpt.DiagnConf.CoeffEMA*elapsed
 	}
 }
-
-func createErrResponse(err error) []byte {
-	respJSON := ErrorResponse{Type: "error", Message: err.Error()}
-
-	bytes, err := json.Marshal(respJSON)
-	if err != nil {
-		log.WithCaller(slf.CallerShort).Error(err.Error())
-		return nil
-	}
-	return bytes
-}

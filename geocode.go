@@ -26,6 +26,14 @@ type Response struct {
 	FullReq   interface{}
 }
 
+// ErrorResponse - struct for error answer to geocoding request
+type ErrorResponse struct {
+	Type     string
+	Message  string
+	ClientID string
+	ID       string
+}
+
 func locationSearch(rawMsg []byte, geocode Nominatim.ReverseGeocode, workerID string) ([]byte, *string, bool, error) {
 
 	if len(rawMsg) == 0 {
@@ -55,7 +63,7 @@ func locationSearch(rawMsg []byte, geocode Nominatim.ReverseGeocode, workerID st
 	place, err := getLocationFromNominatim(geocode, &request.ReverseGeocodeRequest)
 	if err != nil {
 		log.WithCaller(slf.CallerShort).Error(err.Error())
-		return createErrResponse(err), &request.ClientID, true, nil
+		return createErrResponse(err), &request.ClientID, &request.ID, true, nil
 	}
 	response.ReverseGeocodeResponse = *place
 	response.ID = request.ID
@@ -111,4 +119,15 @@ func getLocationJSON(response *Response) ([]byte, error) {
 		return nil, err
 	}
 	return dataJSON, nil
+}
+
+func createErrResponse(clientID, id string, err error) []byte {
+	respJSON := ErrorResponse{Type: "error", Message: err.Error(), ClientID: clientID, ID: id}
+
+	bytes, err := json.Marshal(respJSON)
+	if err != nil {
+		log.WithCaller(slf.CallerShort).Error(err.Error())
+		return nil
+	}
+	return bytes
 }
