@@ -31,7 +31,7 @@ type ErrorResponse struct {
 	Type     string
 	Message  string
 	ClientID string
-	ID       string
+	ID       interface{}
 }
 
 func locationSearch(rawMsg []byte, geocode Nominatim.ReverseGeocode, workerID string) ([]byte, *string, bool, error) {
@@ -121,7 +121,7 @@ func getLocationJSON(response *Response) ([]byte, error) {
 	return dataJSON, nil
 }
 
-func createErrResponse(clientID, id string, err error) []byte {
+func createErrResponse(clientID string, id interface{}, err error) []byte {
 	respJSON := ErrorResponse{Type: "error", Message: err.Error(), ClientID: clientID, ID: id}
 
 	bytes, err := json.Marshal(respJSON)
