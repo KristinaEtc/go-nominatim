@@ -2,17 +2,16 @@ package main
 
 import (
 	//important: must execute first; do not move
-	_ "github.com/KristinaEtc/slflog"
-)
-
-import (
 	"encoding/json"
 	"os"
 	"time"
 
 	"github.com/KristinaEtc/config"
 	"github.com/KristinaEtc/go-nominatim/lib"
+	"github.com/KristinaEtc/go-nominatim/lib/monitoring"
+	_ "github.com/KristinaEtc/slflog"
 	"github.com/go-stomp/stomp"
+
 	_ "github.com/lib/pq"
 	"github.com/ventu-io/slf"
 )
@@ -243,7 +242,9 @@ func runProcessLoop(reverseGeocode Nominatim.ReverseGeocode, subscribed chan boo
 	close(subscribed)
 
 	// init a struct with info for monitoring queque
-	data := initMonitoringData(connSend.GetConnInfo())
+	data := monitoring.InitMonitoringData(connSend.GetConnInfo(), Version, globalOpt.Name, uuid)
+	data.LastReconnect = data.StartTime
+	data.Subtype = "worker"
 
 	ticker := time.NewTicker(time.Duration(globalOpt.DiagnConf.TimeOut) * time.Second)
 	var ok bool
@@ -261,13 +262,13 @@ func runProcessLoop(reverseGeocode Nominatim.ReverseGeocode, subscribed chan boo
 			//break
 		case <-ticker.C:
 			data.CurrentTime = time.Now().Format(time.RFC3339)
-			calculateSeverity(&data)
+			data.CalculateSeverity(globalOpt.DiagnConf.CoeffSeverity)
 			log.Infof("status: requests:%d/%d errors:%d/%d ok:%d/%d errResp:%d/%d",
 				data.Reqs-prevNumOfReq, data.Reqs,
 				data.ErrorCount-prevNumOfErr, data.ErrorCount,
 				data.SuccResp-prevNumOfSuccResp, data.SuccResp,
 				data.ErrResp-prevNumOfErrResp, data.ErrResp)
-			calculateRatePerSec(&data, &prevNumOfReq, &prevNumOfErr, &prevNumOfErrResp, &prevNumOfSuccResp)
+			calculateRatePerSec(data, &prevNumOfReq, &prevNumOfErr, &prevNumOfErrResp, &prevNumOfSuccResp)
 			b, err := json.Marshal(data)
 			if err != nil {
 				log.Error(err.Error())
