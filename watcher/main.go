@@ -194,7 +194,7 @@ func processMessages(config ServerConf, pr Process) {
 		select {
 
 		case t := <-tickerSendRequests.C:
-			sendRequest(config, pr, i, t)
+			go sendRequest(config, pr, i, t)
 
 		case msg := <-chGotAddrResponse:
 			processAddrResponse(&timeRequestsByID, &responseDelaysByID, &dataDelays, &dataStatistic, msg)
