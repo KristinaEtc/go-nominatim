@@ -229,58 +229,15 @@ func processMessages(config ServerConf, pr Process) {
 
 		case msg := <-chGotAddrResponse:
 
-			//message := string(msg)
-			//log.Debugf("Res=[%s]", message)
-
-			requestID, requestTime, workerID, err := parseResponse(msg)
-			if err != nil {
-				log.Error(err.Error())
-				processCommonError(err.Error(), &dataStatistic)
-				continue
-			}
-
-			timeRequest, ok := timeRequestsByID[requestID]
-			if !ok {
-				log.Debugf("timeRequestsByID: [%v]", timeRequestsByID)
-				errMessage := fmt.Sprintf("No requests was sended with such id: [%d,%d]", requestID, requestTime)
-				log.Warnf(errMessage)
-				processCommonError(errMessage, &dataStatistic)
-				continue
-			}
-
-			t := time.Now().UTC().UnixNano()
-			responseDelaysByID[workerID] = append(responseDelaysByID[workerID], (t-timeRequest)/1000000)
-			//log.Debugf("[%d] t.UTC().Unix() - timeRequestsByID[requestID]=[%d]", requestID, (t-timeRequestsByID[requestID])/1000000)
-
-			delete(timeRequestsByID, requestID)
-			processSuccess(&dataStatistic)
+			processAddrResponse(&timeRequestsByID, &responseDelaysByID, &dataDelays, &dataStatistic, msg)
 
 		case id := <-pr.chGotAddrRequest:
 
-			//id is a string with  requestID and requestTime: "id,time"
-			requestID, requestTime, err := parseID(id)
-			if err != nil {
-				log.Error(err.Error())
-				processCommonError(err.Error(), &dataStatistic)
-				continue
-			}
-			timeRequestsByID[requestID] = requestTime
-			processNewRequest(&dataStatistic)
+			processAddrRequest(id, &dataStatistic, &timeRequestsByID)
 
 		case t := <-tickerCheckRequestsTimeOut.C:
-			//log.Debug("CheckIDs")
 
-			for requestID, requestTime := range timeRequestsByID {
-
-				delay := (t.UTC().UnixNano() - requestTime) / 1000000
-				if delay >= requestTimeOut*1000 {
-					log.Warnf("timeout for: [%d,%d]", requestID, requestTime)
-
-					errMessage := fmt.Sprintf("TimeOut for: [%d,%d]", requestID, requestTime)
-					processErrorTimeOut(errMessage, &dataStatistic)
-					delete(timeRequestsByID, requestID)
-				}
-			}
+			checkRequestTimeOut(t, &timeRequestsByID, &responseDelaysByID, &dataStatistic)
 
 		case _ = <-tickerSendDelayStat.C:
 
