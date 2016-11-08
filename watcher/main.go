@@ -2,13 +2,11 @@ package main
 
 //important: must execute first; do not move
 import (
-	"fmt"
 	"math/rand"
 	"time"
 
 	"github.com/KristinaEtc/config"
 	"github.com/KristinaEtc/go-nominatim/lib/monitoring"
-	"github.com/KristinaEtc/go-nominatim/lib/utils/request"
 	"github.com/go-stomp/stomp"
 	"github.com/ventu-io/slf"
 )
@@ -124,43 +122,6 @@ func getClientID() string {
 	return nodeID + "_AddressReply"
 }
 
-func sendMessages(config ServerConf, pr Process) {
-
-	defer func() {
-		stop <- true
-	}()
-
-	// Every config.RequestFreq seconds function creates a request to a server
-	// with generated address, sends request and sends id of this request
-	// to channel reqIDs, which will be readed in recvMessages function.
-	var i int64
-	for {
-
-		ticker := time.NewTicker(time.Second * time.Duration(config.RequestFreq))
-
-		for t := range ticker.C {
-			i = i + 1
-			lat, lon, zoom := request.GenerateAddress(r1)
-			id := fmt.Sprintf("%d,%d", i, t.UTC().UnixNano())
-
-			reqInJSON, err := request.MakeReqFloat(lat, lon, zoom, getClientID(), id)
-			if err != nil {
-				log.Errorf("Error parse request parameters: [%v]", err)
-				continue
-			}
-
-			//log.Debugf("Req=%s", *reqInJSON)
-
-			err = pr.connSend.Send(config.RequestQueueName, "application/json", []byte(*reqInJSON), nil...)
-			if err != nil {
-				log.Errorf("Failed to send to server: [%v]", err)
-				continue
-			}
-			pr.chGotAddrRequest <- id
-		}
-	}
-}
-
 func initMonitoringStructures() (ResponseStatistic, ResponseDelays) {
 	dataStatistic := ResponseStatistic{}
 	dataStatistic.MonitoringData = monitoring.InitMonitoringData(
@@ -193,6 +154,9 @@ func processMessages(config ServerConf, pr Process) {
 
 	dataStatistic, dataDelays := initMonitoringStructures()
 
+	// sending requests every config.RequestFreq
+	tickerSendRequests := time.NewTicker(time.Second * time.Duration(config.RequestFreq))
+
 	// checking requests every second
 	tickerCheckRequestsTimeOut := time.NewTicker(time.Second * 1)
 
@@ -224,19 +188,21 @@ func processMessages(config ServerConf, pr Process) {
 	var timeRequestsByID = make(map[int]int64)
 	var responseDelaysByID = make(map[string][]int64)
 
+	var i int64
+
 	for {
 		select {
 
-		case msg := <-chGotAddrResponse:
+		case t := <-tickerSendRequests.C:
+			sendRequest(config, pr, i, t)
 
+		case msg := <-chGotAddrResponse:
 			processAddrResponse(&timeRequestsByID, &responseDelaysByID, &dataDelays, &dataStatistic, msg)
 
 		case id := <-pr.chGotAddrRequest:
-
 			processAddrRequest(id, &dataStatistic, &timeRequestsByID)
 
 		case t := <-tickerCheckRequestsTimeOut.C:
-
 			checkRequestTimeOut(t, &timeRequestsByID, &responseDelaysByID, &dataStatistic)
 
 		case _ = <-tickerSendDelayStat.C:
@@ -350,7 +316,7 @@ func main() {
 	log.Info("starting working...")
 
 	go processMessages(globalOpt.Server, process)
-	go sendMessages(globalOpt.Server, process)
+	//go sendMessages(globalOpt.Server, process)
 
 	<-stop
 	<-stop

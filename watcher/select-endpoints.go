@@ -4,7 +4,39 @@ import (
 	"encoding/json"
 	"fmt"
 	"time"
+
+	"github.com/KristinaEtc/go-nominatim/lib/utils/request"
 )
+
+//sendRequest sends requests...
+func sendRequest(config ServerConf, pr Process, i int64, t time.Time) {
+
+	defer func() {
+		stop <- true
+	}()
+
+	// Every config.RequestFreq seconds function creates a request to a server
+	// with generated address, sends request and sends id of this request
+	// to channel reqIDs, which will be readed in recvMessages function.
+	i = i + 1
+	lat, lon, zoom := request.GenerateAddress(r1)
+	id := fmt.Sprintf("%d,%d", i, t.UTC().UnixNano())
+
+	reqInJSON, err := request.MakeReqFloat(lat, lon, zoom, getClientID(), id)
+	if err != nil {
+		log.Errorf("Error parse request parameters: [%v]", err)
+		return
+	}
+
+	//log.Debugf("Req=%s", *reqInJSON)
+
+	err = pr.connSend.Send(config.RequestQueueName, "application/json", []byte(*reqInJSON), nil...)
+	if err != nil {
+		log.Errorf("Failed to send to server: [%v]", err)
+		return
+	}
+	pr.chGotAddrRequest <- id
+}
 
 //processAddrResponse process when address response was got
 func processAddrResponse(timeRequestsByID *map[int]int64, responseDelaysByID *map[string][]int64, dataDelays *ResponseDelays, dataStatistic *ResponseStatistic, msg []byte) {
