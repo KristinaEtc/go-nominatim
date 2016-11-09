@@ -245,6 +245,7 @@ func processMessages(config ServerConf, pr Process) {
 			responseDelaysByID = make(map[string][]int64)
 		}
 	}
+	log.Debug("HERE?")
 }
 
 func subscribe(node ServerConf, pr *Process) (err error) {
