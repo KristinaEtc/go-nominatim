@@ -84,7 +84,7 @@ func (p *PlaceLookup) setOSMID(req_type string, id int) {
 
 var addressType string
 
-func (p *PlaceLookup) Lookup() (placeData map[string]string) {
+func (p *PlaceLookup) Lookup() (placeData map[string]string, err error) {
 
 	//var (
 	//	place_id string
@@ -111,7 +111,7 @@ func (p *PlaceLookup) Lookup() (placeData map[string]string) {
 	rows, err := p.db.Query(sqlReq, p.placeID)
 	if err != nil {
 		log.Errorf("Error: %v", err.Error())
-		return
+		return nil, err
 	}
 	defer rows.Close()
 
@@ -157,9 +157,9 @@ func (p *PlaceLookup) Lookup() (placeData map[string]string) {
 		//$aPlace['aAddress'] = $aAddress;
 	}*/
 
-	var classTypes map[string]map[string]string = getClassTypes()
+	var classTypes = getClassTypes()
 	addressType = ""
-	var classTypeKey string = placeData["class"] + ":" + placeData["type"] + ":" + placeData["admin_level"]
+	var classTypeKey = placeData["class"] + ":" + placeData["type"] + ":" + placeData["admin_level"]
 
 	_, ok := classTypes[classTypeKey]
 	dataSimple, okSimple := classTypes[classTypeKey]["simplelabel"]
@@ -179,5 +179,5 @@ func (p *PlaceLookup) Lookup() (placeData map[string]string) {
 	//log.Println(addressType)
 	placeData["addresstype"] = addressType
 
-	return placeData
+	return placeData, nil
 }

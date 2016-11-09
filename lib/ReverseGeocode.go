@@ -234,7 +234,10 @@ func (r *reverseGeocodeImpl) Lookup(request *ReverseGeocodeRequest) (*ReverseGeo
 		//placeLookup.SetLanguagePreference()
 		placeLookup.SetIncludeAddressDetails(request.IncludeDetails)
 		placeLookup.SetPlaceID(iPlaceID.Int64)
-		dataMap := placeLookup.Lookup()
+		dataMap, err := placeLookup.Lookup()
+		if err != nil {
+			return nil, err
+		}
 		return parsePlaceDataMap(dataMap), nil
 		//return dataMapToStruct(dataMap, r.machineID, resentFullReq, r.fullReq), nil
 	}

@@ -102,6 +102,7 @@ func getLocationFromNominatim(reverseGeocode Nominatim.ReverseGeocode, request *
 
 	place, err := reverseGeocode.Lookup(request)
 	if err != nil {
+
 		return nil, err
 	}
 
