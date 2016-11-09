@@ -28,9 +28,10 @@ type Response struct {
 
 // ErrorResponse - struct for error answer to geocoding request
 type ErrorResponse struct {
-	Type    string
-	Message string
-	ID      interface{}
+	Type      string
+	Message   string
+	ID        interface{}
+	MachineID interface{}
 }
 
 func locationSearch(rawMsg []byte, geocode Nominatim.ReverseGeocode, workerID string) ([]byte, *string, bool, error) {
@@ -62,7 +63,7 @@ func locationSearch(rawMsg []byte, geocode Nominatim.ReverseGeocode, workerID st
 	place, err := getLocationFromNominatim(geocode, &request.ReverseGeocodeRequest)
 	if err != nil {
 		log.WithCaller(slf.CallerShort).Error(err.Error())
-		return createErrResponse(err, request.ID), &request.ClientID, true, nil
+		return createErrResponse(err, request.ID, workerID), &request.ClientID, true, nil
 	}
 	response.ReverseGeocodeResponse = *place
 	response.ID = request.ID
@@ -72,7 +73,7 @@ func locationSearch(rawMsg []byte, geocode Nominatim.ReverseGeocode, workerID st
 	placeJSON, err := getLocationJSON(&response)
 	if err != nil {
 		log.WithCaller(slf.CallerShort).Error(err.Error())
-		return createErrResponse(err, request.ID), &request.ClientID, true, nil
+		return createErrResponse(err, request.ID, workerID), &request.ClientID, true, nil
 	}
 	if globalOpt.IsDebug {
 		log.Debugf("Client:%s ID:%d placeJSON:%s", request.ClientID, request.ID, string(placeJSON))
@@ -121,8 +122,8 @@ func getLocationJSON(response *Response) ([]byte, error) {
 	return dataJSON, nil
 }
 
-func createErrResponse(err error, id interface{}) []byte {
-	respJSON := ErrorResponse{Type: "error", Message: err.Error(), ID: id}
+func createErrResponse(err error, id interface{}, machineID interface{}) []byte {
+	respJSON := ErrorResponse{Type: "error", Message: err.Error(), ID: id, MachineID: machineID}
 
 	bytes, err := json.Marshal(respJSON)
 	if err != nil {
