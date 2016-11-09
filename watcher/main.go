@@ -206,7 +206,6 @@ func processMessages(config ServerConf, pr Process) {
 			checkRequestTimeOut(t, &timeRequestsByID, &responseDelaysByID, &dataStatistic)
 
 		case _ = <-tickerSendDelayStat.C:
-
 			//log.Debug("sendStatusMSg")
 			dataDelays.CurrentTime = time.Now().UTC().Format(time.RFC3339)
 			dataDelays.Subtype = "watcher-delays"

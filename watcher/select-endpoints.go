@@ -11,9 +11,9 @@ import (
 //sendRequest sends requests...
 func sendRequest(config ServerConf, pr Process, i int64, t time.Time) {
 
-	defer func() {
+	/*defer func() {
 		stop <- true
-	}()
+	}()*/
 
 	// Every config.RequestFreq seconds function creates a request to a server
 	// with generated address, sends request and sends id of this request

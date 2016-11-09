@@ -83,7 +83,7 @@ func MakeReqFloat(lat, lon float64, zoom int, clientID, ID string) (reqInJSON *s
 // GenerateAddress generates an address across the Belarus
 func GenerateAddress(r1 *rand.Rand) (float64, float64, int) {
 
-	lat := r1.Float64()*0 + 500
+	lat := r1.Float64()*4 + 54
 	lon := r1.Float64()*8 + 26
 
 	return lat, lon, 18
