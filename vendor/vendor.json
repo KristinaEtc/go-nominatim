@@ -21,14 +21,8 @@
 			"revisionTime": "2016-08-20T10:45:24Z"
 		},
 		{
-			"checksumSHA1": "Up7iN/UWeGShqcJyZ+FC4XcPAvc=",
-			"path": "github.com/go-stomp/stomp",
-			"revision": "7c4ad759fecc05f1053f27fe8a3715b1869433f6",
-			"revisionTime": "2016-10-27T08:00:02Z"
-		},
-		{
 			"origin": "github.com/KristinaEtc/stomp/...",
-			"path": "github.com/go-stomp/stomp/...^",
+			"path": "github.com/go-stomp/stomp/...",
 			"revision": ""
 		},
 		{
