@@ -7,7 +7,9 @@
     "QueueName": "/topic/alert",
     "ClientID": "myiduuu",
     "MusicFile": "7.aiff",
+    "Name": "my-computer"
   },
+  "DirWithUUID": ".notifier/",
   "Logs": {
     "Handlers": [
       {"Type": "stderr", 

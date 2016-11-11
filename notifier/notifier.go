@@ -21,6 +21,7 @@ const (
 )
 
 var log = slf.WithContext("alrt.go")
+var nodeID string
 
 /*-------------------------
   Config option structures
@@ -40,11 +41,13 @@ type GlobalConf struct {
 	MessageDumpInterval int
 	Heartbeat           int
 	MusicFile           string
+	Name                string
 }
 
 // ConfFile is a file with all program options
 type ConfFile struct {
-	Global GlobalConf
+	Global      GlobalConf
+	DirWithUUID string
 }
 
 var globalOpt = ConfFile{
@@ -58,7 +61,9 @@ var globalOpt = ConfFile{
 		MessageDumpInterval: 20,
 		Heartbeat:           30,
 		MusicFile:           "7.aiff",
+		Name:                "notifier",
 	},
+	DirWithUUID: ".notifier/",
 }
 
 // NecessaryFields storesrows of json request, that we want to get
@@ -82,10 +87,7 @@ func getID(msg []byte) (string, error) {
 	return data.ID, nil
 }
 
-var options = []func(*stomp.Conn) error{
-	stomp.ConnOpt.Login(globalOpt.Global.ServerUser, globalOpt.Global.ServerPassword),
-	stomp.ConnOpt.Host(globalOpt.Global.ServerAddr),
-}
+var options = []func(*stomp.Conn) error{}
 
 var (
 	stop = make(chan bool)
@@ -98,6 +100,8 @@ func Connect() (*stomp.Conn, error) {
 		stomp.ConnOpt.Login(globalOpt.Global.ServerUser, globalOpt.Global.ServerPassword),
 		stomp.ConnOpt.Host(globalOpt.Global.ServerAddr),
 		stomp.ConnOpt.HeartBeat(heartbeat, heartbeat),
+		stomp.ConnOpt.Header("wormmq.link.peer_name", globalOpt.Global.Name),
+		stomp.ConnOpt.Header("wormmq.link.peer", nodeID),
 	}
 
 	conn, err := stomp.Dial("tcp", globalOpt.Global.ServerAddr, options...)
@@ -153,6 +157,7 @@ func recvMessages() {
 func main() {
 
 	config.ReadGlobalConfig(&globalOpt, "stomp-alert options")
+	nodeID = config.GetUUID(globalOpt.DirWithUUID)
 
 	log.Info("starting working...")
 
