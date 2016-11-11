@@ -194,36 +194,26 @@ func processMessages(config ServerConf, pr Process) {
 		select {
 
 		case t := <-tickerSendRequests.C:
-			log.Debug("tickerSendRequests.C: start")
-			go sendRequest(config, pr, i, t)
-			log.Debug("tickerSendRequests.C: stop")
+			sendRequest(config, pr, &i, t)
 
 		case msg := <-chGotAddrResponse:
-			log.Debug("chGotAddrResponse start")
 			processAddrResponse(&timeRequestsByID, &responseDelaysByID, &dataDelays, &dataStatistic, msg)
-			log.Debug("chGotAddrResponse stop")
 
 		case id := <-pr.chGotAddrRequest:
-			log.Debug("GotAddrReques start")
 			processAddrRequest(id, &dataStatistic, &timeRequestsByID)
-			log.Debug("GotAddrReques stop")
 
 		case t := <-tickerCheckRequestsTimeOut.C:
-			log.Debug("tickerCheckRequestsTimeOut.C: start")
 			checkRequestTimeOut(t, &timeRequestsByID, &responseDelaysByID, &dataStatistic)
-			log.Debug("tickerCheckRequestsTimeOut.C: stop")
 
 		case _ = <-tickerSendDelayStat.C:
-			log.Debug("tickerSendDelayStat.C: start")
 			//log.Debug("sendStatusMSg")
 			dataDelays.CurrentTime = time.Now().UTC().Format(time.RFC3339)
 			dataDelays.Subtype = "watcher-delays"
 
-			log.Debugf("respDelays=%v", responseDelaysByID)
-			for k, v := range responseDelaysByID {
-				log.Warnf("k=%s v=%v\n", k, v)
-				dataDelays.Subsystem = k
-				dataDelays.DelaysByID = v
+			for id, sliceDelays := range responseDelaysByID {
+				//log.Debugf("id=%s sliceDelays=%v\n", id, sliceDelays)
+				dataDelays.Subsystem = id
+				dataDelays.DelaysByID = sliceDelays
 
 				err := sendMessageDelays(&dataDelays, &dataStatistic, pr, config.MonitoringTopic)
 				if err != nil {
@@ -242,7 +232,7 @@ func processMessages(config ServerConf, pr Process) {
 				continue
 			}
 			if dataStatistic.CurrErrTimeOut != 0 {
-				log.Debug("Sending alert message...")
+				log.Warn("Sending alert message...")
 				err = pr.connSend.Send(config.AlertTopic, "application/json", reqInJSON, nil...)
 				if err != nil {
 					log.Errorf("Failed to send to server: [%s]", err.Error())
@@ -253,7 +243,6 @@ func processMessages(config ServerConf, pr Process) {
 
 			cleanErrorStat(&dataStatistic)
 			responseDelaysByID = make(map[string][]int64)
-			log.Debug("tickerSendDelayStat.C: stop")
 		}
 	}
 }

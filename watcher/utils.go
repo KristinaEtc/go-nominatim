@@ -52,7 +52,6 @@ func parseID(id string) (int, int64, error) {
 	}
 
 	numStr := strings.TrimSuffix(wasSended[0], ",")
-	//log.Debugf("numStr=%s", numStr)
 	num, err := strconv.Atoi(numStr)
 	if err != nil {
 		return 0, t, err
@@ -70,9 +69,9 @@ func parseResponse(msg []byte) (int, int64, string, error) {
 		return 0, 0, "", err
 	}
 
-	if data.ID == "" && data.WorkerID == "" {
-		log.Warnf("Messsage with empty ID: %s", string(msg))
-		return 0, 0, "", errors.New("No utc value in request")
+	if data.ID == "" || data.WorkerID == "" {
+		log.Warnf("Messsage with empty ID or WorkerID: %s", string(msg))
+		return 0, 0, "", errors.New("message ID or/and WorkerID is empty")
 	}
 
 	requestID, requestTime, err := parseID(data.ID)

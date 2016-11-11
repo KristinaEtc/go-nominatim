@@ -9,7 +9,7 @@ import (
 )
 
 //sendRequest sends requests...
-func sendRequest(config ServerConf, pr Process, i int64, t time.Time) {
+func sendRequest(config ServerConf, pr Process, i *int64, t time.Time) {
 
 	/*defer func() {
 		stop <- true
@@ -18,7 +18,7 @@ func sendRequest(config ServerConf, pr Process, i int64, t time.Time) {
 	// Every config.RequestFreq seconds function creates a request to a server
 	// with generated address, sends request and sends id of this request
 	// to channel reqIDs, which will be readed in recvMessages function.
-	i = i + 1
+	*i = *i + 1
 	lat, lon, zoom := request.GenerateAddress(r1)
 	id := fmt.Sprintf("%d,%d", i, t.UTC().UnixNano())
 
@@ -41,7 +41,6 @@ func sendRequest(config ServerConf, pr Process, i int64, t time.Time) {
 //processAddrResponse process when address response was got
 func processAddrResponse(timeRequestsByID *map[int]int64, responseDelaysByID *map[string][]int64, dataDelays *ResponseDelays, dataStatistic *ResponseStatistic, msg []byte) {
 	//message := string(msg)
-	//log.Debugf("Res=[%s]", message)
 
 	requestID, requestTime, workerID, err := parseResponse(msg)
 	if err != nil {
@@ -52,7 +51,7 @@ func processAddrResponse(timeRequestsByID *map[int]int64, responseDelaysByID *ma
 
 	timeRequest, ok := (*timeRequestsByID)[requestID]
 	if !ok {
-		log.Debugf("timeRequestsByID: [%v]", timeRequestsByID)
+
 		errMessage := fmt.Sprintf("No requests was sended with such id: [%d,%d]", requestID, requestTime)
 		log.Warnf(errMessage)
 		processCommonError(errMessage, dataStatistic)
@@ -119,15 +118,13 @@ func sendMessageStatistic(dataDelays *ResponseStatistic, dataStatistic *Response
 	dataStatistic.CurrentTime = time.Now().UTC().Format(time.RFC3339)
 	dataStatistic.Subtype = "watcher-statistic"
 
-	//log.Debugf("dataStatistic.sybsystem=%s", dataStatistic.Subsystem)
-
 	reqInJSON, err := json.Marshal(dataStatistic)
 	if err != nil {
 		processCommonError(err.Error(), dataStatistic)
 		return nil, err
 	}
 
-	//log.Debugf("Status Message=%s", reqInJSON)
+	log.Debugf("Status Message=%s", reqInJSON)
 
 	err = pr.connSend.Send(topic, "application/json", []byte(reqInJSON), nil...)
 	if err != nil {
