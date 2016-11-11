@@ -1,0 +1,91 @@
+{
+	"comment": "",
+	"ignore": "test",
+	"package": [
+		{
+			"checksumSHA1": "nvbuv8VaKqzdQcvHTxv78m8aqh8=",
+			"path": "github.com/KristinaEtc/alert",
+			"revision": "e8d6bbf8020cf3f8652efc828887bd685e3a07a8",
+			"revisionTime": "2016-10-31T11:06:17Z"
+		},
+		{
+			"checksumSHA1": "csETv6A+vWaoMHKZKSBYkzvtyzk=",
+			"path": "github.com/KristinaEtc/config",
+			"revision": "8ed85620171d70ac3b86a2d3a427dd8f06a4a139",
+			"revisionTime": "2016-10-07T10:41:38Z"
+		},
+		{
+			"checksumSHA1": "PvXc+VPbwrb7FcPKXvRaqEcA43A=",
+			"path": "github.com/KristinaEtc/slflog",
+			"revision": "db9bfff4780c9bfc182ecf445c758ebd793e8feb",
+			"revisionTime": "2016-08-20T10:45:24Z"
+		},
+		{
+			"checksumSHA1": "Up7iN/UWeGShqcJyZ+FC4XcPAvc=",
+			"path": "github.com/go-stomp/stomp",
+			"revision": "7c4ad759fecc05f1053f27fe8a3715b1869433f6",
+			"revisionTime": "2016-10-27T08:00:02Z"
+		},
+		{
+			"checksumSHA1": "yAk4OpmBoTMsC5M/XYwrXioKH1I=",
+			"path": "github.com/go-stomp/stomp/frame",
+			"revision": "7c4ad759fecc05f1053f27fe8a3715b1869433f6",
+			"revisionTime": "2016-10-27T08:00:02Z"
+		},
+		{
+			"checksumSHA1": "OFB3spI9K2CJz9cyDzi/5Fgkom0=",
+			"path": "github.com/gordonklaus/portaudio",
+			"revision": "ee87a127ce8f364049c62b5ae0bef46cc87dae3d",
+			"revisionTime": "2016-03-26T21:52:59Z"
+		},
+		{
+			"checksumSHA1": "6nmAJBw2phU9MUmkUnqFvbO5urg=",
+			"path": "github.com/kardianos/osext",
+			"revision": "29ae4ffbc9a6fe9fb2bc5029050ce6996ea1d3bc",
+			"revisionTime": "2015-12-22T15:32:29Z"
+		},
+		{
+			"checksumSHA1": "dNYxHiBLalTqluak2/Z8c3RsSEM=",
+			"path": "github.com/lib/pq",
+			"revision": "50761b0867bd1d9d069276790bcd4a3bccf2324a",
+			"revisionTime": "2016-08-31T22:25:20Z"
+		},
+		{
+			"checksumSHA1": "xppHi82MLqVx1eyQmbhTesAEjx8=",
+			"path": "github.com/lib/pq/oid",
+			"revision": "50761b0867bd1d9d069276790bcd4a3bccf2324a",
+			"revisionTime": "2016-08-31T22:25:20Z"
+		},
+		{
+			"checksumSHA1": "L/2QM0dnBiQvV01ykYFcmQyvNb8=",
+			"path": "github.com/mattn/go-gtk/glib",
+			"revision": "f1745a456be85ef980b8e85868609ece9e8d7f60",
+			"revisionTime": "2016-10-10T14:20:34Z"
+		},
+		{
+			"checksumSHA1": "TwbVDVhLZbjHkVzDVChKj0k94VE=",
+			"path": "github.com/mqu/go-notify",
+			"revision": "ef6f6f49d093be44ff1ec9879b1a7173b8bce2c6",
+			"revisionTime": "2013-07-19T19:40:48Z"
+		},
+		{
+			"checksumSHA1": "zmC8/3V4ls53DJlNTKDZwPSC/dA=",
+			"path": "github.com/satori/go.uuid",
+			"revision": "b061729afc07e77a8aa4fad0a2fd840958f1942a",
+			"revisionTime": "2016-09-27T10:08:44Z"
+		},
+		{
+			"checksumSHA1": "6wNdwwFgO/a7Dm0Ywj7NxK/p9dU=",
+			"path": "github.com/ventu-io/slf",
+			"revision": "43c1a8878c1f98a1a88268c6805080b3c6be945b",
+			"revisionTime": "2016-04-29T23:35:11Z"
+		},
+		{
+			"checksumSHA1": "CL/xrk+ViG1KixIKIuDiRUUSMZM=",
+			"path": "github.com/ventu-io/slog",
+			"revision": "82f9bc9959769f12189886094adc6b986bba085a",
+			"revisionTime": "2016-05-01T20:56:29Z"
+		}
+	],
+	"rootPath": "github.com/KristinaEtc/go-nominatim"
+}

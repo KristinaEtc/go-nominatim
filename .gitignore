@@ -3,6 +3,8 @@ cli/main
 cli/test.txt
 cli/test.csv
 
+vendor/github.com
+
 client/go-stomp-client.config
 client/go-stomp-client
 
