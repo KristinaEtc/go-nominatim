@@ -119,13 +119,15 @@ func sendMessageStatistic(dataDelays *ResponseStatistic, dataStatistic *Response
 	dataStatistic.CurrentTime = time.Now().UTC().Format(time.RFC3339)
 	dataStatistic.Subtype = "watcher-statistic"
 
+	//log.Debugf("dataStatistic.sybsystem=%s", dataStatistic.Subsystem)
+
 	reqInJSON, err := json.Marshal(dataStatistic)
 	if err != nil {
 		processCommonError(err.Error(), dataStatistic)
 		return nil, err
 	}
 
-	log.Debugf("Status Message=%s", reqInJSON)
+	//log.Debugf("Status Message=%s", reqInJSON)
 
 	err = pr.connSend.Send(topic, "application/json", []byte(reqInJSON), nil...)
 	if err != nil {

@@ -194,23 +194,34 @@ func processMessages(config ServerConf, pr Process) {
 		select {
 
 		case t := <-tickerSendRequests.C:
+			log.Debug("tickerSendRequests.C: start")
 			go sendRequest(config, pr, i, t)
+			log.Debug("tickerSendRequests.C: stop")
 
 		case msg := <-chGotAddrResponse:
+			log.Debug("chGotAddrResponse start")
 			processAddrResponse(&timeRequestsByID, &responseDelaysByID, &dataDelays, &dataStatistic, msg)
+			log.Debug("chGotAddrResponse stop")
 
 		case id := <-pr.chGotAddrRequest:
+			log.Debug("GotAddrReques start")
 			processAddrRequest(id, &dataStatistic, &timeRequestsByID)
+			log.Debug("GotAddrReques stop")
 
 		case t := <-tickerCheckRequestsTimeOut.C:
+			log.Debug("tickerCheckRequestsTimeOut.C: start")
 			checkRequestTimeOut(t, &timeRequestsByID, &responseDelaysByID, &dataStatistic)
+			log.Debug("tickerCheckRequestsTimeOut.C: stop")
 
 		case _ = <-tickerSendDelayStat.C:
+			log.Debug("tickerSendDelayStat.C: start")
 			//log.Debug("sendStatusMSg")
 			dataDelays.CurrentTime = time.Now().UTC().Format(time.RFC3339)
 			dataDelays.Subtype = "watcher-delays"
 
+			log.Debugf("respDelays=%v", responseDelaysByID)
 			for k, v := range responseDelaysByID {
+				log.Warnf("k=%s v=%v\n", k, v)
 				dataDelays.Subsystem = k
 				dataDelays.DelaysByID = v
 
@@ -242,9 +253,9 @@ func processMessages(config ServerConf, pr Process) {
 
 			cleanErrorStat(&dataStatistic)
 			responseDelaysByID = make(map[string][]int64)
+			log.Debug("tickerSendDelayStat.C: stop")
 		}
 	}
-	log.Debug("HERE?")
 }
 
 func subscribe(node ServerConf, pr *Process) (err error) {
