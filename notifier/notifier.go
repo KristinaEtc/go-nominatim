@@ -20,7 +20,7 @@ const (
 	clientID    = "clientID"
 )
 
-var log = slf.WithContext("alrt.go")
+var log = slf.WithContext("notifier.go")
 var nodeID string
 
 /*-------------------------
