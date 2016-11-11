@@ -27,10 +27,9 @@
 			"revisionTime": "2016-10-27T08:00:02Z"
 		},
 		{
-			"checksumSHA1": "yAk4OpmBoTMsC5M/XYwrXioKH1I=",
-			"path": "github.com/go-stomp/stomp/frame",
-			"revision": "7c4ad759fecc05f1053f27fe8a3715b1869433f6",
-			"revisionTime": "2016-10-27T08:00:02Z"
+			"origin": "github.com/KristinaEtc/stomp/...",
+			"path": "github.com/go-stomp/stomp/...^",
+			"revision": ""
 		},
 		{
 			"checksumSHA1": "OFB3spI9K2CJz9cyDzi/5Fgkom0=",
@@ -81,10 +80,9 @@
 			"revisionTime": "2016-04-29T23:35:11Z"
 		},
 		{
-			"checksumSHA1": "CL/xrk+ViG1KixIKIuDiRUUSMZM=",
-			"path": "github.com/ventu-io/slog",
-			"revision": "82f9bc9959769f12189886094adc6b986bba085a",
-			"revisionTime": "2016-05-01T20:56:29Z"
+			"origin":"https://github.com/ventu-io/slf",
+			"path": "github.com/KristinaEtc/slflog",
+			"revision": ""
 		}
 	],
 	"rootPath": "github.com/KristinaEtc/go-nominatim"
