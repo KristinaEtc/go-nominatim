@@ -16,4 +16,4 @@ branches:
         - release
         - master
         - dev
-          deploy
+        - deploy
