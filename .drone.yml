@@ -8,3 +8,8 @@ build:
                         - go get github.com/kardianos/govendor
                         - govendor sync
                         - go build
+                branches:
+                        - release
+                        - master
+                        - dev
+                        - deploy
