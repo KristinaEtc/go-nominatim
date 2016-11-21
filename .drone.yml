@@ -1,19 +1,17 @@
 build:
-        image: golang:1.6.1
-        environment:
-                - GOOS=linux
-                - GOARCH=amd64
-                - CGO_ENABLED=0
-
-build:
-        image: golang
-        commands:
-                - go get github.com/kardianos/govendor
-                - govendor sync
-                - go build
-
 branches:
         - release
         - master
         - dev
         - deploy
+
+        go-nominatim:
+                image: golang:1.6.1
+                environment:
+                        - GOOS=linux
+                        - GOARCH=amd64
+                        - CGO_ENABLED=0
+                commands:
+                        - go get github.com/kardianos/govendor
+                        - govendor sync
+                        - go build

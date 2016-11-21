@@ -25,7 +25,7 @@
         "DBname": "nominatim",
         "Host": "localhost",
         "User": "geocode",
-        "Password": "geocode"
+        "Password": "_geocode#"
     },
     "Logs": {
         "Handlers": [
