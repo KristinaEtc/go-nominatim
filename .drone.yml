@@ -1,11 +1,4 @@
 build:
-branches:
-        - release
-        - master
-        - dev
-        - deploy
-
-        go-nominatim:
                 image: golang:1.6.1
                 environment:
                         - GOOS=linux
