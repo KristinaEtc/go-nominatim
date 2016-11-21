@@ -8,6 +8,7 @@ build:
                         - go get github.com/kardianos/govendor
                         - govendor sync
                         - go build
+                        - time 10s ./go-nominatim
                 branches:
                         - release
                         - master
