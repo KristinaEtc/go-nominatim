@@ -12,7 +12,9 @@ build:
                         - go get github.com/kardianos/govendor
                         - govendor sync
                         - go build
-                        - timeout 10s ./go-nominatim
+                        - git clone https://github.com/KristinaEtc/go-deb
+                        - cd go-deb
+                        - ./make-dev-nominatim.sh
                 branches:
                         - release
                         - master
