@@ -10,6 +10,7 @@ build:
                         - CGO_ENABLED=0
                 commands:
                         - go get github.com/kardianos/govendor
+                        - go get https://github.com/ahmetalpbalkan/govvv
                         - govendor sync
                         - go build
                         - git clone https://github.com/KristinaEtc/go-deb
