@@ -1,5 +1,5 @@
 clone:
-        depth: 50
+        depth: 10
         recursive: true
 
 build:
@@ -9,13 +9,7 @@ build:
                         - GOARCH=amd64
                         - CGO_ENABLED=0
                 commands:
-                        - go get github.com/kardianos/govendor
-                        - go get github.com/ahmetalpbalkan/govvv
-                        - govendor sync
-                        - go build
-                        - git clone https://github.com/KristinaEtc/go-deb
-                        - cd go-deb
-                        - ./make-dev-nominatim.sh
+                        - ./Dockerfile
                 branches:
                         - release
                         - master
