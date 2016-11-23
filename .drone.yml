@@ -6,10 +6,9 @@ build:
         image: go-nominatim
                 commands:
                         - go env
-
-                branches:
-                        - release
-                        - master
-                        - dev
-                        - deploy
+branches:
+        - release
+        - master
+        - dev
+        - deploy
 
