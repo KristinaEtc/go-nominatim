@@ -9,7 +9,7 @@ build:
                         - GOARCH=amd64
                         - CGO_ENABLED=0
                 commands:
-                        - ./Dockerfile
+                        -docker build -t nominatim .
                 branches:
                         - release
                         - master
