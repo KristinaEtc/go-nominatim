@@ -3,15 +3,40 @@ clone:
         recursive: true
 
 build:
-                image: golang:1.6.1
+                image: ubuntu
                 environment:
                         - GOOS=linux
                         - GOARCH=amd64
                         - CGO_ENABLED=0
                 commands:
-                        - sudo docker build -t nominatim .
+                        - apt-get update -qq &&  apt-get install -y checkinstall && \
+                          apt-get install -y curl && apt-get install -yq golang && \
+                          apt-get install -yq git
+                        - mkdir /go
+                        - GOPATH /go
+                        - go env && \
+                          whereis checkinstall && \
+                export PATH=$PATH:$GOROOT/bin:$GOPATH/bin && \
+                echo '$GOPATH/bin' && \
+                cd /go && \
+                go get github.com/ahmetalpbalkan/govvv && \
+                go get github.com/kardianos/govendor && \
+                cd /go/src/github.com/kardianos/govendor && go install && \
+                govendor status
+                go get github.com/KristinaEtc/go-nominatim || true && \
+                 cd /go/src/github.com/KristinaEtc/go-nominatim && \
+                 echo "OK" && \
+                 git checkout dev && \
+                  govendor init && \
+                  govendor sync && \
+                  govvv build
+                  cd go/src/github.com/KristinaEtc/go-nominatim && \
+                  git clone https://github.com/KristinaEtc/go-deb && \
+                  cd go-deb && ./make-dev-nominatim.sh
+
                 branches:
                         - release
                         - master
                         - dev
                         - deploy
+
