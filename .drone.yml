@@ -4,10 +4,6 @@ clone:
 
 build:
         image: go-nominatim
-                environment:
-                        - GOOS=linux
-                        - GOARCH=amd64
-                        - CGO_ENABLED=0
                 commands:
                         - go env
 
