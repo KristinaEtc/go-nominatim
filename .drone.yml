@@ -3,17 +3,12 @@ clone:
         recursive: true
 
 build:
-                image: ubuntu
+        image: go-nominatim
                 environment:
                         - GOOS=linux
                         - GOARCH=amd64
                         - CGO_ENABLED=0
                 commands:
-                        - apt-get update -qq &&  apt-get install -y checkinstall && \
-                          apt-get install -y curl && apt-get install -yq golang && \
-                          apt-get install -yq git
-                        - mkdir /go
-                        - GOPATH /go
                         - go env
 
                 branches:
