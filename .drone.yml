@@ -15,6 +15,7 @@ build:
                   cd /go/src/github.com/KristinaEtc/go-nominatim && git checkout dev &&
                   govendor sync && govvv build
                 - export PATH=$PATH:$GOROOT/bin:$GOPATH/bin &&
+                  cd /go && ls && src && ls && github.com && ls && KristinaEtc && ls && go-nominatim &&
                   cd /go/src/github.com/KristinaEtc/go-nominatim && git clone https://github.com/KristinaEtc/go-deb &&
                   cd go-deb && ./make-dev-nominatim.sh
 
