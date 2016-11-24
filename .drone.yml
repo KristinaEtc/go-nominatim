@@ -8,5 +8,16 @@ build:
                 - go env
                 - apt-get install -yq git
                 - export PATH=$PATH:$GOROOT/bin:$GOPATH/bin &&
-                  echo $PATH
+                  echo $PATH &&
+                  cd /go &&
+                  go get github.com/ahmetalpbalkan/govvv &&
+                  cd /go/src/github.com/kardianos/govendor && go install && govendor status
+                - export PATH=$PATH:$GOROOT/bin:$GOPATH/bin &&
+                  go get github.com/KristinaEtc/go-nominatim || true &&
+                  echo "OK" &&
+                  cd /go/src/github.com/KristinaEtc/go-nominatim && git checkout dev &&
+                  govendor sync && govvv build
+                - export PATH=$PATH:$GOROOT/bin:$GOPATH/bin &&
+                  cd go/src/github.com/KristinaEtc/go-nominatim && git clone https://github.com/KristinaEtc/go-deb &&
+                  cd go-deb && ./make-dev-nominatim.sh
 
