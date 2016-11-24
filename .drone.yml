@@ -12,7 +12,7 @@ build:
                 - export PATH=$PATH:$GOROOT/bin:$GOPATH/bin &&
                   go get github.com/KristinaEtc/go-nominatim || true &&
                   echo "OK" &&
-                  cd $GOPATH/src/github.com/KristinaEtc/go-nominatim && git checkout dev &&
+                  cd $GOPATH/src/github.com/KristinaEtc/go-nominatim && git checkout deploy &&
                   govendor sync && govvv build
                 - export PATH=$PATH:$GOROOT/bin:$GOPATH/bin &&
                   cd $GOPATH/src/github.com/KristinaEtc/go-nominatim && git clone https://github.com/KristinaEtc/go-deb &&
