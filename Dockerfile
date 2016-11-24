@@ -1,4 +1,4 @@
-FROM go-nominatim
+FROM ubuntu-initial
 MAINTAINER Kristina Etc
 
 RUN apt-get install -yq git
