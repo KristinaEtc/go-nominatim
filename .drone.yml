@@ -5,17 +5,16 @@ clone:
 build:
         image: ubuntu-initial
         commands:
-                - export PATH=$PATH:$GOROOT/bin:$GOPATH/bin &&
+                - echo $GOPATH && export PATH=$PATH:$GOROOT/bin:$GOPATH/bin &&
                   cd /go &&
                   go get github.com/ahmetalpbalkan/govvv &&
-                  go get github.com/kardianos/govendor && cd /go/src/github.com/kardianos/govendor && go install && govendor status
+                  go get github.com/kardianos/govendor && cd $GOPATH/src/github.com/kardianos/govendor && go install && govendor status
                 - export PATH=$PATH:$GOROOT/bin:$GOPATH/bin &&
                   go get github.com/KristinaEtc/go-nominatim || true &&
                   echo "OK" &&
-                  cd /go/src/github.com/KristinaEtc/go-nominatim && git checkout dev &&
+                  cd $GOPATH/src/github.com/KristinaEtc/go-nominatim && git checkout dev &&
                   govendor sync && govvv build
                 - export PATH=$PATH:$GOROOT/bin:$GOPATH/bin &&
-                  cd /go && ls && src && ls && github.com && ls && KristinaEtc && ls && go-nominatim &&
-                  cd /go/src/github.com/KristinaEtc/go-nominatim && git clone https://github.com/KristinaEtc/go-deb &&
+                  cd $GOPATH/src/github.com/KristinaEtc/go-nominatim && git clone https://github.com/KristinaEtc/go-deb &&
                   cd go-deb && ./make-dev-nominatim.sh
 
