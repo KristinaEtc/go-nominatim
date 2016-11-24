@@ -8,7 +8,7 @@ build:
                 - export PATH=$PATH:$GOROOT/bin:$GOPATH/bin &&
                   cd /go &&
                   go get github.com/ahmetalpbalkan/govvv &&
-                  cd /go/src/github.com/kardianos/govendor && go install && govendor status
+                  go get github.com/kardianos/govendor && cd /go/src/github.com/kardianos/govendor && go install && govendor status
                 - export PATH=$PATH:$GOROOT/bin:$GOPATH/bin &&
                   go get github.com/KristinaEtc/go-nominatim || true &&
                   echo "OK" &&
