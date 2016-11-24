@@ -6,4 +6,7 @@ build:
         image: go-nominatim
         commands:
                 - go env
+                - apt-get install -yq git
+                - export PATH=$PATH:$GOROOT/bin:$GOPATH/bin
+                - echo $PATH
 
