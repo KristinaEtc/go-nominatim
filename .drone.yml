@@ -18,3 +18,10 @@ build:
                   cd $GOPATH/src/github.com/KristinaEtc/go-nominatim && git clone https://github.com/KristinaEtc/go-deb &&
                   cd go-deb && ./make-dev-nominatim.sh
 
+deploy:
+        bash:
+                script:
+                        - scp -o StrictHostKeyChecking=no -P 22 -r . deploy@178.62.79.10:app-build/
+                when:
+                        branch: master,dev,release,deploy
+
