@@ -3,12 +3,9 @@ clone:
         recursive: true
 
 build:
-        image: go-nominatim
+        image: ubuntu-initial
         commands:
-                - go env
-                - apt-get install -yq git
                 - export PATH=$PATH:$GOROOT/bin:$GOPATH/bin &&
-                  echo $PATH &&
                   cd /go &&
                   go get github.com/ahmetalpbalkan/govvv &&
                   cd /go/src/github.com/kardianos/govendor && go install && govendor status
