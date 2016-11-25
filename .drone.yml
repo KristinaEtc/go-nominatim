@@ -19,7 +19,8 @@ build:
                   cd go-deb && ./make-dev-nominatim.sh
                 - ls -la
                 - whereis ssh
-                - cd -t  ~/.ssh
+                - mkdir ~/.ssh
+                - cd  ~/.ssh
                 - touch drone
                 - echo $${SSH_K} > ~/.ssh/drone
                 - cat ~/.ssh/drone
