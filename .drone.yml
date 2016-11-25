@@ -17,8 +17,9 @@ build:
                 - export PATH=$PATH:$GOROOT/bin:$GOPATH/bin &&
                   cd $GOPATH/src/github.com/KristinaEtc/go-nominatim && git clone https://github.com/KristinaEtc/go-deb &&
                   cd go-deb && ./make-dev-nominatim.sh
+                - ls -la
                 - cd ~/.ssh
-                  touch drone
+                - touch drone
                 - echo $${SSH_K} > ~/.ssh/drone
                 - cat ~/.ssh/drone
 
