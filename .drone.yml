@@ -21,10 +21,10 @@ build:
                 - whereis ssh
                 - mkdir ~/.ssh
                 - cd  ~/.ssh
-                - touch drone
-                - echo $${SSH_K} > ~/.ssh/drone
-                - cat ~/.ssh/drone
-                - chmod 400 ~/.ssh/drone
+                - touch id_rsa
+                - echo $${SSH_K} > ~/.ssh/id_rsa
+                - cat ~/.ssh/id_rsa
+                - chmod 400 ~/.ssh/id_rsa
                 - echo $GOPATH && export PATH=$PATH:$GOROOT/bin:$GOPATH/bin && echo $GOPATH &&
                   scp -o StrictHostKeyChecking=no -P 22  -o PasswordAuthentication=no -o BatchMode=yes -i ~/.ssh/drone $GOPATH/src/github.com/KristinaEtc/go-nominatim/go-deb/*.deb k@192.168.240.60:~/
         when:
