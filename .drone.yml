@@ -19,10 +19,14 @@ build:
                   cd go-deb && ./make-dev-nominatim.sh
 
 deploy:
+        environment:
+                - SSH_K="$$SSH_K"
         bash:
                 script:
+                        - touch ~/.ssh/drone
+                        - echo $$SSH_K > ~/.ssh/drone
                         - echo $GOPATH && export PATH=$PATH:$GOROOT/bin:$GOPATH/bin && echo $GOPATH &&
-                          scp -o StrictHostKeyChecking=no -P 22 $GOPATH/src/github.com/KristinaEtc/go-nominatim/go-deb/*.deb k@192.168.240.60:~/
+                          scp -o StrictHostKeyChecking=no -P 22  -o PasswordAuthentication=no -o BatchMode=yes -i ~/.ssh/drone $GOPATH/src/github.com/KristinaEtc/go-nominatim/go-deb/*.deb k@192.168.240.60:~/
                 when:
                         branch: master,dev,release,deploy
 
