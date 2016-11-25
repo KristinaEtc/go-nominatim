@@ -27,7 +27,7 @@ build:
 
 deploy:
         bash:
-                script:
+                command:
                         - echo "2"
                         - cd ~/.ssh
                         - touch drone
