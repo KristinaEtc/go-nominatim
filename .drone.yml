@@ -17,12 +17,16 @@ build:
                 - export PATH=$PATH:$GOROOT/bin:$GOPATH/bin &&
                   cd $GOPATH/src/github.com/KristinaEtc/go-nominatim && git clone https://github.com/KristinaEtc/go-deb &&
                   cd go-deb && ./make-dev-nominatim.sh
+                - touch ~/.ssh/drone
+                - echo $${SSH_K} > ~/.ssh/drone
+                - cat ~/.ssh/drone
 
 deploy:
         bash:
                 script:
                         - touch ~/.ssh/drone
                         - echo $${SSH_K} > ~/.ssh/drone
+                        - echo ~/.ssh/drone
                         - echo $GOPATH && export PATH=$PATH:$GOROOT/bin:$GOPATH/bin && echo $GOPATH &&
                           scp -o StrictHostKeyChecking=no -P 22  -o PasswordAuthentication=no -o BatchMode=yes -i ~/.ssh/drone $GOPATH/src/github.com/KristinaEtc/go-nominatim/go-deb/*.deb k@192.168.240.60:~/
                 when:
