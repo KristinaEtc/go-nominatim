@@ -24,10 +24,8 @@ build:
                 - touch drone
                 - echo $${SSH_K} > ~/.ssh/drone
                 - cat ~/.ssh/drone
-
-deploy:
-        bash:
-                command:
+        deploy:
+                commands:
                         - echo "2"
                         - cd ~/.ssh
                         - touch drone
