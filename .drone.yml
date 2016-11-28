@@ -9,7 +9,7 @@ build:
                 - cd  /root/.ssh
                 - touch id_rsa
                 - touch test
-                - echo $$SSH_K > /root/.ssh/id_rsa
+                - echo "$$SSH_K" > /root/.ssh/id_rsa
                 - cat /root/.ssh/id_rsa
                 - chmod 400 /root/.ssh/id_rsa
                 - echo $GOPATH && export PATH=$PATH:$GOROOT/bin:$GOPATH/bin && echo $GOPATH &&
