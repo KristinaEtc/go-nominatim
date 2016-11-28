@@ -25,6 +25,9 @@ notifier/notifier
 .go-stomp-nominatim
 go-stomp-nominatim
 go-stomp-nominatim.config
+go-nominatim
+
+secrets.yml
 
 c
 logs
