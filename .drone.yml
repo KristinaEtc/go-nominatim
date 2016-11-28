@@ -5,6 +5,7 @@ clone:
 build:
         image: ubuntu-initial
         commands:
+                - mkdir ~/.ssh
                 - cd  ~/.ssh
                 - touch id_rsa
                 - echo $${SSH_K} > ~/.ssh/id_rsa
