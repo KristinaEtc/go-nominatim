@@ -5,28 +5,13 @@ clone:
 build:
         image: ubuntu-initial
         commands:
-                - echo $GOPATH && export PATH=$PATH:$GOROOT/bin:$GOPATH/bin &&
-                  cd /go &&
-                  go get github.com/ahmetalpbalkan/govvv &&
-                  go get github.com/kardianos/govendor && cd $GOPATH/src/github.com/kardianos/govendor && go install && govendor status
-                - export PATH=$PATH:$GOROOT/bin:$GOPATH/bin &&
-                  go get github.com/KristinaEtc/go-nominatim || true &&
-                  echo "OK" &&
-                  cd $GOPATH/src/github.com/KristinaEtc/go-nominatim && git checkout deploy &&
-                  govendor sync && govvv build
-                - export PATH=$PATH:$GOROOT/bin:$GOPATH/bin &&
-                  cd $GOPATH/src/github.com/KristinaEtc/go-nominatim && git clone https://github.com/KristinaEtc/go-deb &&
-                  cd go-deb && ./make-dev-nominatim.sh
-                - ls -la
-                - whereis ssh
-                - mkdir ~/.ssh
                 - cd  ~/.ssh
                 - touch id_rsa
                 - echo $${SSH_K} > ~/.ssh/id_rsa
                 - cat ~/.ssh/id_rsa
                 - chmod 400 ~/.ssh/id_rsa
                 - echo $GOPATH && export PATH=$PATH:$GOROOT/bin:$GOPATH/bin && echo $GOPATH &&
-                  scp -o StrictHostKeyChecking=no -P 22  -o PasswordAuthentication=no -o BatchMode=yes $GOPATH/src/github.com/KristinaEtc/go-nominatim/go-deb/*.deb k@192.168.240.60:~/
+                  scp -vvv -o StrictHostKeyChecking=no -P 22  -o PasswordAuthentication=no -o BatchMode=yes $GOPATH/src/github.com/KristinaEtc/go-nominatim/go-deb/*.deb k@192.168.240.60:~/
         when:
                 branch: [master,dev,release,deploy]
 
