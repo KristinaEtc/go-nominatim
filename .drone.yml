@@ -5,12 +5,11 @@ clone:
 build:
         image: ubuntu-initial
         commands:
-                - mkdir ~/.ssh
-                - cd  ~/.ssh
+                - mkdir /root/.ssh
+                - cd  /root/.ssh
                 - touch id_rsa
-                - echo $${SSH_K} > ~/.ssh/id_rsa
-                - cat ~/.ssh/id_rsa
-                - chmod 400 ~/.ssh/id_rsa
+                - echo $${SSH_K} > /root/.ssh/id_rsa
+                - chmod 400 /root/.ssh/id_rsa
                 - echo $GOPATH && export PATH=$PATH:$GOROOT/bin:$GOPATH/bin && echo $GOPATH &&
                   scp -vvv -o StrictHostKeyChecking=no -P 22  -o PasswordAuthentication=no -o BatchMode=yes $GOPATH/src/github.com/KristinaEtc/go-nominatim/go-deb/*.deb k@192.168.240.60:~/
         when:
