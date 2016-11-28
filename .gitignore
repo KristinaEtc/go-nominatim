@@ -29,5 +29,6 @@ go-nominatim
 
 secrets.yml
 
+go-deb
 c
 logs
